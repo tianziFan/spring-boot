@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -36,6 +36,8 @@ import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.beans.factory.config.Scope;
+import org.springframework.beans.factory.support.DefaultListableBeanFactory;
+import org.springframework.boot.web.context.ConfigurableWebServerApplicationContext;
 import org.springframework.boot.web.server.WebServer;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.boot.web.servlet.ServletContextInitializer;
@@ -53,6 +55,7 @@ import org.springframework.web.context.WebApplicationContext;
 import org.springframework.web.context.support.GenericWebApplicationContext;
 import org.springframework.web.context.support.ServletContextAwareProcessor;
 import org.springframework.web.context.support.ServletContextResource;
+import org.springframework.web.context.support.ServletContextScope;
 import org.springframework.web.context.support.WebApplicationContextUtils;
 
 /**
@@ -82,19 +85,20 @@ import org.springframework.web.context.support.WebApplicationContextUtils;
  *
  * @author Phillip Webb
  * @author Dave Syer
+ * @since 2.0.0
  * @see AnnotationConfigServletWebServerApplicationContext
  * @see XmlServletWebServerApplicationContext
  * @see ServletWebServerFactory
  */
-public class ServletWebServerApplicationContext extends GenericWebApplicationContext {
+public class ServletWebServerApplicationContext extends GenericWebApplicationContext
+		implements ConfigurableWebServerApplicationContext {
 
-	private static final Log logger = LogFactory
-			.getLog(ServletWebServerApplicationContext.class);
+	private static final Log logger = LogFactory.getLog(ServletWebServerApplicationContext.class);
 
 	/**
 	 * Constant value for the DispatcherServlet bean name. A Servlet bean with this name
 	 * is deemed to be the "main" servlet and is automatically given a mapping of "/" by
-	 * default. To change the default behaviour you can use a
+	 * default. To change the default behavior you can use a
 	 * {@link ServletRegistrationBean} or a different bean name.
 	 */
 	public static final String DISPATCHER_SERVLET_NAME = "dispatcherServlet";
@@ -103,7 +107,22 @@ public class ServletWebServerApplicationContext extends GenericWebApplicationCon
 
 	private ServletConfig servletConfig;
 
-	private String namespace;
+	private String serverNamespace;
+
+	/**
+	 * Create a new {@link ServletWebServerApplicationContext}.
+	 */
+	public ServletWebServerApplicationContext() {
+	}
+
+	/**
+	 * Create a new {@link ServletWebServerApplicationContext} with the given
+	 * {@code DefaultListableBeanFactory}.
+	 * @param beanFactory the DefaultListableBeanFactory instance to use for this context
+	 */
+	public ServletWebServerApplicationContext(DefaultListableBeanFactory beanFactory) {
+		super(beanFactory);
+	}
 
 	/**
 	 * Register ServletContextAwareProcessor.
@@ -111,9 +130,9 @@ public class ServletWebServerApplicationContext extends GenericWebApplicationCon
 	 */
 	@Override
 	protected void postProcessBeanFactory(ConfigurableListableBeanFactory beanFactory) {
-		beanFactory.addBeanPostProcessor(
-				new WebApplicationContextServletContextAwareProcessor(this));
+		beanFactory.addBeanPostProcessor(new WebApplicationContextServletContextAwareProcessor(this));
 		beanFactory.ignoreDependencyInterface(ServletContextAware.class);
+		registerWebApplicationScopes();
 	}
 
 	@Override
@@ -165,8 +184,7 @@ public class ServletWebServerApplicationContext extends GenericWebApplicationCon
 				getSelfInitializer().onStartup(servletContext);
 			}
 			catch (ServletException ex) {
-				throw new ApplicationContextException("Cannot initialize servlet context",
-						ex);
+				throw new ApplicationContextException("Cannot initialize servlet context", ex);
 			}
 		}
 		initPropertySources();
@@ -180,18 +198,14 @@ public class ServletWebServerApplicationContext extends GenericWebApplicationCon
 	 */
 	protected ServletWebServerFactory getWebServerFactory() {
 		// Use bean names so that we don't consider the hierarchy
-		String[] beanNames = getBeanFactory()
-				.getBeanNamesForType(ServletWebServerFactory.class);
+		String[] beanNames = getBeanFactory().getBeanNamesForType(ServletWebServerFactory.class);
 		if (beanNames.length == 0) {
-			throw new ApplicationContextException(
-					"Unable to start ServletWebServerApplicationContext due to missing "
-							+ "ServletWebServerFactory bean.");
+			throw new ApplicationContextException("Unable to start ServletWebServerApplicationContext due to missing "
+					+ "ServletWebServerFactory bean.");
 		}
 		if (beanNames.length > 1) {
-			throw new ApplicationContextException(
-					"Unable to start ServletWebServerApplicationContext due to multiple "
-							+ "ServletWebServerFactory beans : "
-							+ StringUtils.arrayToCommaDelimitedString(beanNames));
+			throw new ApplicationContextException("Unable to start ServletWebServerApplicationContext due to multiple "
+					+ "ServletWebServerFactory beans : " + StringUtils.arrayToCommaDelimitedString(beanNames));
 		}
 		return getBeanFactory().getBean(beanNames[0], ServletWebServerFactory.class);
 	}
@@ -208,17 +222,24 @@ public class ServletWebServerApplicationContext extends GenericWebApplicationCon
 
 	private void selfInitialize(ServletContext servletContext) throws ServletException {
 		prepareWebApplicationContext(servletContext);
-		ConfigurableListableBeanFactory beanFactory = getBeanFactory();
-		ExistingWebApplicationScopes existingScopes = new ExistingWebApplicationScopes(
-				beanFactory);
-		WebApplicationContextUtils.registerWebApplicationScopes(beanFactory,
-				getServletContext());
-		existingScopes.restore();
-		WebApplicationContextUtils.registerEnvironmentBeans(beanFactory,
-				getServletContext());
+		registerApplicationScope(servletContext);
+		WebApplicationContextUtils.registerEnvironmentBeans(getBeanFactory(), servletContext);
 		for (ServletContextInitializer beans : getServletContextInitializerBeans()) {
 			beans.onStartup(servletContext);
 		}
+	}
+
+	private void registerApplicationScope(ServletContext servletContext) {
+		ServletContextScope appScope = new ServletContextScope(servletContext);
+		getBeanFactory().registerScope(WebApplicationContext.SCOPE_APPLICATION, appScope);
+		// Register as ServletContext attribute, for ContextCleanupListener to detect it.
+		servletContext.setAttribute(ServletContextScope.class.getName(), appScope);
+	}
+
+	private void registerWebApplicationScopes() {
+		ExistingWebApplicationScopes existingScopes = new ExistingWebApplicationScopes(getBeanFactory());
+		WebApplicationContextUtils.registerWebApplicationScopes(getBeanFactory());
+		existingScopes.restore();
 	}
 
 	/**
@@ -240,8 +261,7 @@ public class ServletWebServerApplicationContext extends GenericWebApplicationCon
 	 * @param servletContext the operational servlet context
 	 */
 	protected void prepareWebApplicationContext(ServletContext servletContext) {
-		Object rootContext = servletContext.getAttribute(
-				WebApplicationContext.ROOT_WEB_APPLICATION_CONTEXT_ATTRIBUTE);
+		Object rootContext = servletContext.getAttribute(WebApplicationContext.ROOT_WEB_APPLICATION_CONTEXT_ATTRIBUTE);
 		if (rootContext != null) {
 			if (rootContext == this) {
 				throw new IllegalStateException(
@@ -253,25 +273,20 @@ public class ServletWebServerApplicationContext extends GenericWebApplicationCon
 		Log logger = LogFactory.getLog(ContextLoader.class);
 		servletContext.log("Initializing Spring embedded WebApplicationContext");
 		try {
-			servletContext.setAttribute(
-					WebApplicationContext.ROOT_WEB_APPLICATION_CONTEXT_ATTRIBUTE, this);
+			servletContext.setAttribute(WebApplicationContext.ROOT_WEB_APPLICATION_CONTEXT_ATTRIBUTE, this);
 			if (logger.isDebugEnabled()) {
-				logger.debug(
-						"Published root WebApplicationContext as ServletContext attribute with name ["
-								+ WebApplicationContext.ROOT_WEB_APPLICATION_CONTEXT_ATTRIBUTE
-								+ "]");
+				logger.debug("Published root WebApplicationContext as ServletContext attribute with name ["
+						+ WebApplicationContext.ROOT_WEB_APPLICATION_CONTEXT_ATTRIBUTE + "]");
 			}
 			setServletContext(servletContext);
 			if (logger.isInfoEnabled()) {
 				long elapsedTime = System.currentTimeMillis() - getStartupDate();
-				logger.info("Root WebApplicationContext: initialization completed in "
-						+ elapsedTime + " ms");
+				logger.info("Root WebApplicationContext: initialization completed in " + elapsedTime + " ms");
 			}
 		}
 		catch (RuntimeException | Error ex) {
 			logger.error("Context initialization failed", ex);
-			servletContext.setAttribute(
-					WebApplicationContext.ROOT_WEB_APPLICATION_CONTEXT_ATTRIBUTE, ex);
+			servletContext.setAttribute(WebApplicationContext.ROOT_WEB_APPLICATION_CONTEXT_ATTRIBUTE, ex);
 			throw ex;
 		}
 	}
@@ -306,13 +321,13 @@ public class ServletWebServerApplicationContext extends GenericWebApplicationCon
 	}
 
 	@Override
-	public void setNamespace(String namespace) {
-		this.namespace = namespace;
+	public String getServerNamespace() {
+		return this.serverNamespace;
 	}
 
 	@Override
-	public String getNamespace() {
-		return this.namespace;
+	public void setServerNamespace(String serverNamespace) {
+		this.serverNamespace = serverNamespace;
 	}
 
 	@Override
@@ -330,6 +345,7 @@ public class ServletWebServerApplicationContext extends GenericWebApplicationCon
 	 * the server has not yet been created.
 	 * @return the embedded web server
 	 */
+	@Override
 	public WebServer getWebServer() {
 		return this.webServer;
 	}
@@ -365,12 +381,12 @@ public class ServletWebServerApplicationContext extends GenericWebApplicationCon
 		}
 
 		public void restore() {
-			for (Map.Entry<String, Scope> entry : this.scopes.entrySet()) {
+			this.scopes.forEach((key, value) -> {
 				if (logger.isInfoEnabled()) {
-					logger.info("Restoring user defined scope " + entry.getKey());
+					logger.info("Restoring user defined scope " + key);
 				}
-				this.beanFactory.registerScope(entry.getKey(), entry.getValue());
-			}
+				this.beanFactory.registerScope(key, value);
+			});
 		}
 
 	}

@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -39,10 +39,11 @@ import org.springframework.boot.loader.tools.LibraryScope;
  * @author Phillip Webb
  * @author Andy Wilkinson
  * @author Stephane Nicoll
+ * @since 1.0.0
  */
 public class ArtifactsLibraries implements Libraries {
 
-	private static final Map<String, LibraryScope> scopes;
+	private static final Map<String, LibraryScope> SCOPES;
 
 	static {
 		Map<String, LibraryScope> libraryScopes = new HashMap<>();
@@ -50,7 +51,7 @@ public class ArtifactsLibraries implements Libraries {
 		libraryScopes.put(Artifact.SCOPE_RUNTIME, LibraryScope.RUNTIME);
 		libraryScopes.put(Artifact.SCOPE_PROVIDED, LibraryScope.PROVIDED);
 		libraryScopes.put(Artifact.SCOPE_SYSTEM, LibraryScope.PROVIDED);
-		scopes = Collections.unmodifiableMap(libraryScopes);
+		SCOPES = Collections.unmodifiableMap(libraryScopes);
 	}
 
 	private final Set<Artifact> artifacts;
@@ -59,8 +60,7 @@ public class ArtifactsLibraries implements Libraries {
 
 	private final Log log;
 
-	public ArtifactsLibraries(Set<Artifact> artifacts, Collection<Dependency> unpacks,
-			Log log) {
+	public ArtifactsLibraries(Set<Artifact> artifacts, Collection<Dependency> unpacks, Log log) {
 		this.artifacts = artifacts;
 		this.unpacks = unpacks;
 		this.log = log;
@@ -70,7 +70,7 @@ public class ArtifactsLibraries implements Libraries {
 	public void doWithLibraries(LibraryCallback callback) throws IOException {
 		Set<String> duplicates = getDuplicates(this.artifacts);
 		for (Artifact artifact : this.artifacts) {
-			LibraryScope scope = scopes.get(artifact.getScope());
+			LibraryScope scope = SCOPES.get(artifact.getScope());
 			if (scope != null && artifact.getFile() != null) {
 				String name = getFileName(artifact);
 				if (duplicates.contains(name)) {
@@ -78,8 +78,7 @@ public class ArtifactsLibraries implements Libraries {
 					name = artifact.getGroupId() + "-" + name;
 					this.log.debug("Renamed to: " + name);
 				}
-				callback.library(new Library(name, artifact.getFile(), scope,
-						isUnpackRequired(artifact)));
+				callback.library(new Library(name, artifact.getFile(), scope, isUnpackRequired(artifact)));
 			}
 		}
 	}

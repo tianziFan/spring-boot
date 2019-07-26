@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,7 +16,7 @@
 
 package org.springframework.boot.actuate.audit;
 
-import java.util.Date;
+import java.time.Instant;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -28,6 +28,7 @@ import org.springframework.util.Assert;
  * @author Dave Syer
  * @author Phillip Webb
  * @author Vedran Pavic
+ * @since 1.0.0
  */
 public class InMemoryAuditEventRepository implements AuditEventRepository {
 
@@ -70,17 +71,7 @@ public class InMemoryAuditEventRepository implements AuditEventRepository {
 	}
 
 	@Override
-	public List<AuditEvent> find(Date after) {
-		return find(null, after, null);
-	}
-
-	@Override
-	public List<AuditEvent> find(String principal, Date after) {
-		return find(principal, after, null);
-	}
-
-	@Override
-	public List<AuditEvent> find(String principal, Date after, String type) {
+	public List<AuditEvent> find(String principal, Instant after, String type) {
 		LinkedList<AuditEvent> events = new LinkedList<>();
 		synchronized (this.monitor) {
 			for (int i = 0; i < this.events.length; i++) {
@@ -93,10 +84,10 @@ public class InMemoryAuditEventRepository implements AuditEventRepository {
 		return events;
 	}
 
-	private boolean isMatch(String principal, Date after, String type, AuditEvent event) {
+	private boolean isMatch(String principal, Instant after, String type, AuditEvent event) {
 		boolean match = true;
 		match = match && (principal == null || event.getPrincipal().equals(principal));
-		match = match && (after == null || event.getTimestamp().compareTo(after) >= 0);
+		match = match && (after == null || event.getTimestamp().isAfter(after));
 		match = match && (type == null || event.getType().equals(type));
 		return match;
 	}

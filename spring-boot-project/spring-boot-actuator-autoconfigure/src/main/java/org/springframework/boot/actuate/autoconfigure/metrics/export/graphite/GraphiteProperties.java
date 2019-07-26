@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -24,54 +24,62 @@ import io.micrometer.graphite.GraphiteProtocol;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
- * {@link ConfigurationProperties} for configuring Graphite metrics export.
+ * {@link ConfigurationProperties @ConfigurationProperties} for configuring Graphite
+ * metrics export.
  *
  * @author Jon Schneider
+ * @author Stephane Nicoll
  * @since 2.0.0
  */
-@ConfigurationProperties(prefix = "spring.metrics.graphite")
+@ConfigurationProperties(prefix = "management.metrics.export.graphite")
 public class GraphiteProperties {
 
 	/**
-	 * Enable publishing to the backend.
+	 * Whether exporting of metrics to Graphite is enabled.
 	 */
-	private Boolean enabled = true;
+	private boolean enabled = true;
 
 	/**
-	 * The step size (reporting frequency) to use.
+	 * Step size (i.e. reporting frequency) to use.
 	 */
 	private Duration step = Duration.ofMinutes(1);
 
 	/**
-	 * The base time unit used to report rates.
+	 * Base time unit used to report rates.
 	 */
-	private TimeUnit rateUnits;
+	private TimeUnit rateUnits = TimeUnit.SECONDS;
 
 	/**
-	 * The base time unit used to report durations.
+	 * Base time unit used to report durations.
 	 */
-	private TimeUnit durationUnits;
+	private TimeUnit durationUnits = TimeUnit.MILLISECONDS;
 
 	/**
-	 * Graphite host used for publishing.
+	 * Host of the Graphite server to receive exported metrics.
 	 */
-	private String host;
+	private String host = "localhost";
 
 	/**
-	 * Graphite port used for publishing.
+	 * Port of the Graphite server to receive exported metrics.
 	 */
-	private Integer port;
+	private Integer port = 2004;
 
 	/**
 	 * Protocol to use while shipping data to Graphite.
 	 */
-	private GraphiteProtocol protocol = GraphiteProtocol.Pickled;
+	private GraphiteProtocol protocol = GraphiteProtocol.PICKLED;
 
-	public Boolean getEnabled() {
+	/**
+	 * For the default naming convention, turn the specified tag keys into part of the
+	 * metric prefix.
+	 */
+	private String[] tagsAsPrefix = new String[0];
+
+	public boolean isEnabled() {
 		return this.enabled;
 	}
 
-	public void setEnabled(Boolean enabled) {
+	public void setEnabled(boolean enabled) {
 		this.enabled = enabled;
 	}
 
@@ -121,6 +129,14 @@ public class GraphiteProperties {
 
 	public void setProtocol(GraphiteProtocol protocol) {
 		this.protocol = protocol;
+	}
+
+	public String[] getTagsAsPrefix() {
+		return this.tagsAsPrefix;
+	}
+
+	public void setTagsAsPrefix(String[] tagsAsPrefix) {
+		this.tagsAsPrefix = tagsAsPrefix;
 	}
 
 }

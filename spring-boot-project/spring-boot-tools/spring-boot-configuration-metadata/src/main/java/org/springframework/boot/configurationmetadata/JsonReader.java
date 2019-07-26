@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,6 +23,7 @@ import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -31,16 +32,14 @@ import org.json.JSONObject;
  * Read standard json metadata format as {@link ConfigurationMetadataRepository}.
  *
  * @author Stephane Nicoll
- * @since 1.3.0
  */
 class JsonReader {
 
 	private static final int BUFFER_SIZE = 4096;
 
-	private final DescriptionExtractor descriptionExtractor = new DescriptionExtractor();
+	private final SentenceExtractor sentenceExtractor = new SentenceExtractor();
 
-	public RawConfigurationMetadata read(InputStream in, Charset charset)
-			throws IOException {
+	RawConfigurationMetadata read(InputStream in, Charset charset) throws IOException {
 		try {
 			JSONObject json = readJson(in, charset);
 			List<ConfigurationMetadataSource> groups = parseAllSources(json);
@@ -59,8 +58,7 @@ class JsonReader {
 		}
 	}
 
-	private List<ConfigurationMetadataSource> parseAllSources(JSONObject root)
-			throws Exception {
+	private List<ConfigurationMetadataSource> parseAllSources(JSONObject root) throws Exception {
 		List<ConfigurationMetadataSource> result = new ArrayList<>();
 		if (!root.has("groups")) {
 			return result;
@@ -73,8 +71,7 @@ class JsonReader {
 		return result;
 	}
 
-	private List<ConfigurationMetadataItem> parseAllItems(JSONObject root)
-			throws Exception {
+	private List<ConfigurationMetadataItem> parseAllItems(JSONObject root) throws Exception {
 		List<ConfigurationMetadataItem> result = new ArrayList<>();
 		if (!root.has("properties")) {
 			return result;
@@ -87,8 +84,7 @@ class JsonReader {
 		return result;
 	}
 
-	private List<ConfigurationMetadataHint> parseAllHints(JSONObject root)
-			throws Exception {
+	private List<ConfigurationMetadataHint> parseAllHints(JSONObject root) throws Exception {
 		List<ConfigurationMetadataHint> result = new ArrayList<>();
 		if (!root.has("hints")) {
 			return result;
@@ -107,8 +103,7 @@ class JsonReader {
 		source.setType(json.optString("type", null));
 		String description = json.optString("description", null);
 		source.setDescription(description);
-		source.setShortDescription(
-				this.descriptionExtractor.getShortDescription(description));
+		source.setShortDescription(this.sentenceExtractor.getFirstSentence(description));
 		source.setSourceType(json.optString("sourceType", null));
 		source.setSourceMethod(json.optString("sourceMethod", null));
 		return source;
@@ -120,8 +115,7 @@ class JsonReader {
 		item.setType(json.optString("type", null));
 		String description = json.optString("description", null);
 		item.setDescription(description);
-		item.setShortDescription(
-				this.descriptionExtractor.getShortDescription(description));
+		item.setShortDescription(this.sentenceExtractor.getFirstSentence(description));
 		item.setDefaultValue(readItemValue(json.opt("defaultValue")));
 		item.setDeprecation(parseDeprecation(json));
 		item.setSourceType(json.optString("sourceType", null));
@@ -140,8 +134,7 @@ class JsonReader {
 				valueHint.setValue(readItemValue(value.get("value")));
 				String description = value.optString("description", null);
 				valueHint.setDescription(description);
-				valueHint.setShortDescription(
-						this.descriptionExtractor.getShortDescription(description));
+				valueHint.setShortDescription(this.sentenceExtractor.getFirstSentence(description));
 				hint.getValueHints().add(valueHint);
 			}
 		}
@@ -156,8 +149,7 @@ class JsonReader {
 					Iterator<?> keys = parameters.keys();
 					while (keys.hasNext()) {
 						String key = (String) keys.next();
-						valueProvider.getParameters().put(key,
-								readItemValue(parameters.get(key)));
+						valueProvider.getParameters().put(key, readItemValue(parameters.get(key)));
 					}
 				}
 				hint.getValueProviders().add(valueProvider);
@@ -170,22 +162,22 @@ class JsonReader {
 		if (object.has("deprecation")) {
 			JSONObject deprecationJsonObject = object.getJSONObject("deprecation");
 			Deprecation deprecation = new Deprecation();
-			deprecation.setLevel(parseDeprecationLevel(
-					deprecationJsonObject.optString("level", null)));
-			deprecation.setReason(deprecationJsonObject.optString("reason", null));
-			deprecation
-					.setReplacement(deprecationJsonObject.optString("replacement", null));
+			deprecation.setLevel(parseDeprecationLevel(deprecationJsonObject.optString("level", null)));
+			String reason = deprecationJsonObject.optString("reason", null);
+			deprecation.setReason(reason);
+			deprecation.setShortReason(this.sentenceExtractor.getFirstSentence(reason));
+			deprecation.setReplacement(deprecationJsonObject.optString("replacement", null));
 			return deprecation;
 		}
-		return (object.optBoolean("deprecated") ? new Deprecation() : null);
+		return object.optBoolean("deprecated") ? new Deprecation() : null;
 	}
 
 	private Deprecation.Level parseDeprecationLevel(String value) {
 		if (value != null) {
 			try {
-				return Deprecation.Level.valueOf(value.toUpperCase());
+				return Deprecation.Level.valueOf(value.toUpperCase(Locale.ENGLISH));
 			}
-			catch (IllegalArgumentException e) {
+			catch (IllegalArgumentException ex) {
 				// let's use the default
 			}
 		}
@@ -209,7 +201,7 @@ class JsonReader {
 			StringBuilder out = new StringBuilder();
 			InputStreamReader reader = new InputStreamReader(in, charset);
 			char[] buffer = new char[BUFFER_SIZE];
-			int bytesRead = -1;
+			int bytesRead;
 			while ((bytesRead = reader.read(buffer)) != -1) {
 				out.append(buffer, 0, bytesRead);
 			}

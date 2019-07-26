@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,16 +20,15 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
-import org.json.JSONArray;
-import org.json.JSONObject;
-
+import org.springframework.boot.configurationprocessor.json.JSONArray;
+import org.springframework.boot.configurationprocessor.json.JSONObject;
 import org.springframework.boot.configurationprocessor.metadata.ItemMetadata.ItemType;
 
 /**
@@ -41,19 +40,16 @@ import org.springframework.boot.configurationprocessor.metadata.ItemMetadata.Ite
  */
 public class JsonMarshaller {
 
-	private static final Charset UTF_8 = Charset.forName("UTF-8");
-
 	private static final int BUFFER_SIZE = 4098;
 
-	public void write(ConfigurationMetadata metadata, OutputStream outputStream)
-			throws IOException {
+	public void write(ConfigurationMetadata metadata, OutputStream outputStream) throws IOException {
 		try {
-			JSONObject object = new JSONOrderedObject();
+			JSONObject object = new JSONObject();
 			JsonConverter converter = new JsonConverter();
 			object.put("groups", converter.toJsonArray(metadata, ItemType.GROUP));
 			object.put("properties", converter.toJsonArray(metadata, ItemType.PROPERTY));
 			object.put("hints", converter.toJsonArray(metadata.getHints()));
-			outputStream.write(object.toString(2).getBytes(UTF_8));
+			outputStream.write(object.toString(2).getBytes(StandardCharsets.UTF_8));
 		}
 		catch (Exception ex) {
 			if (ex instanceof IOException) {
@@ -78,8 +74,7 @@ public class JsonMarshaller {
 		JSONArray properties = object.optJSONArray("properties");
 		if (properties != null) {
 			for (int i = 0; i < properties.length(); i++) {
-				metadata.add(toItemMetadata((JSONObject) properties.get(i),
-						ItemType.PROPERTY));
+				metadata.add(toItemMetadata((JSONObject) properties.get(i), ItemType.PROPERTY));
 			}
 		}
 		JSONArray hints = object.optJSONArray("hints");
@@ -91,8 +86,7 @@ public class JsonMarshaller {
 		return metadata;
 	}
 
-	private ItemMetadata toItemMetadata(JSONObject object, ItemType itemType)
-			throws Exception {
+	private ItemMetadata toItemMetadata(JSONObject object, ItemType itemType) throws Exception {
 		String name = object.getString("name");
 		String type = object.optString("type", null);
 		String description = object.optString("description", null);
@@ -100,8 +94,8 @@ public class JsonMarshaller {
 		String sourceMethod = object.optString("sourceMethod", null);
 		Object defaultValue = readItemValue(object.opt("defaultValue"));
 		ItemDeprecation deprecation = toItemDeprecation(object);
-		return new ItemMetadata(itemType, name, null, type, sourceType, sourceMethod,
-				description, defaultValue, deprecation);
+		return new ItemMetadata(itemType, name, null, type, sourceType, sourceMethod, description, defaultValue,
+				deprecation);
 	}
 
 	private ItemDeprecation toItemDeprecation(JSONObject object) throws Exception {
@@ -110,11 +104,10 @@ public class JsonMarshaller {
 			ItemDeprecation deprecation = new ItemDeprecation();
 			deprecation.setLevel(deprecationJsonObject.optString("level", null));
 			deprecation.setReason(deprecationJsonObject.optString("reason", null));
-			deprecation
-					.setReplacement(deprecationJsonObject.optString("replacement", null));
+			deprecation.setReplacement(deprecationJsonObject.optString("replacement", null));
 			return deprecation;
 		}
-		return (object.optBoolean("deprecated") ? new ItemDeprecation() : null);
+		return object.optBoolean("deprecated") ? new ItemDeprecation() : null;
 	}
 
 	private ItemHint toItemHint(JSONObject object) throws Exception {
@@ -170,7 +163,7 @@ public class JsonMarshaller {
 
 	private String toString(InputStream inputStream) throws IOException {
 		StringBuilder out = new StringBuilder();
-		InputStreamReader reader = new InputStreamReader(inputStream, UTF_8);
+		InputStreamReader reader = new InputStreamReader(inputStream, StandardCharsets.UTF_8);
 		char[] buffer = new char[BUFFER_SIZE];
 		int bytesRead;
 		while ((bytesRead = reader.read(buffer)) != -1) {

@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,8 +15,6 @@
  */
 
 package org.springframework.boot.context.properties.source;
-
-import java.util.List;
 
 import org.springframework.core.env.EnumerablePropertySource;
 import org.springframework.core.env.PropertySource;
@@ -40,23 +38,21 @@ import org.springframework.core.env.PropertySource;
  */
 interface PropertyMapper {
 
+	PropertyMapping[] NO_MAPPINGS = {};
+
 	/**
 	 * Provide mappings from a {@link ConfigurationPropertySource}
 	 * {@link ConfigurationPropertyName}.
-	 * @param propertySource the property source
 	 * @param configurationPropertyName the name to map
 	 * @return a stream of mappings or {@code Stream#empty()}
 	 */
-	List<PropertyMapping> map(PropertySource<?> propertySource,
-			ConfigurationPropertyName configurationPropertyName);
+	PropertyMapping[] map(ConfigurationPropertyName configurationPropertyName);
 
 	/**
 	 * Provide mappings from a {@link PropertySource} property name.
-	 * @param propertySource the property source
 	 * @param propertySourceName the name to map
 	 * @return a stream of mappings or {@code Stream#empty()}
 	 */
-	List<PropertyMapping> map(PropertySource<?> propertySource,
-			String propertySourceName);
+	PropertyMapping[] map(String propertySourceName);
 
 }

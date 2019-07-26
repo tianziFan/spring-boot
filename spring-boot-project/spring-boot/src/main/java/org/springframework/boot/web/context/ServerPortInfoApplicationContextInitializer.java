@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -30,6 +30,7 @@ import org.springframework.core.env.Environment;
 import org.springframework.core.env.MapPropertySource;
 import org.springframework.core.env.MutablePropertySources;
 import org.springframework.core.env.PropertySource;
+import org.springframework.util.StringUtils;
 
 /**
  * {@link ApplicationContextInitializer} that sets {@link Environment} properties for the
@@ -38,9 +39,9 @@ import org.springframework.core.env.PropertySource;
  * {@link Value @Value} or obtained via the {@link Environment}.
  * <p>
  * If the {@link WebServerInitializedEvent} has a
- * {@link WebServerInitializedEvent#getServerId() server ID}, it will be used to construct
- * the property name. For example, the "management" actuator context will have the
- * property name {@literal "local.management.port"}.
+ * {@link WebServerApplicationContext#getServerNamespace() server namespace} , it will be
+ * used to construct the property name. For example, the "management" actuator context
+ * will have the property name {@literal "local.management.port"}.
  * <p>
  * Properties are automatically propagated up to any parent context.
  *
@@ -48,9 +49,8 @@ import org.springframework.core.env.PropertySource;
  * @author Phillip Webb
  * @since 2.0.0
  */
-public class ServerPortInfoApplicationContextInitializer
-		implements ApplicationContextInitializer<ConfigurableApplicationContext>,
-		ApplicationListener<WebServerInitializedEvent> {
+public class ServerPortInfoApplicationContextInitializer implements
+		ApplicationContextInitializer<ConfigurableApplicationContext>, ApplicationListener<WebServerInitializedEvent> {
 
 	@Override
 	public void initialize(ConfigurableApplicationContext applicationContext) {
@@ -59,16 +59,18 @@ public class ServerPortInfoApplicationContextInitializer
 
 	@Override
 	public void onApplicationEvent(WebServerInitializedEvent event) {
-		String propertyName = "local." + event.getServerId() + ".port";
-		setPortProperty(event.getApplicationContext(), propertyName,
-				event.getWebServer().getPort());
+		String propertyName = "local." + getName(event.getApplicationContext()) + ".port";
+		setPortProperty(event.getApplicationContext(), propertyName, event.getWebServer().getPort());
 	}
 
-	private void setPortProperty(ApplicationContext context, String propertyName,
-			int port) {
+	private String getName(WebServerApplicationContext context) {
+		String name = context.getServerNamespace();
+		return StringUtils.hasText(name) ? name : "server";
+	}
+
+	private void setPortProperty(ApplicationContext context, String propertyName, int port) {
 		if (context instanceof ConfigurableApplicationContext) {
-			setPortProperty(((ConfigurableApplicationContext) context).getEnvironment(),
-					propertyName, port);
+			setPortProperty(((ConfigurableApplicationContext) context).getEnvironment(), propertyName, port);
 		}
 		if (context.getParent() != null) {
 			setPortProperty(context.getParent(), propertyName, port);
@@ -76,8 +78,7 @@ public class ServerPortInfoApplicationContextInitializer
 	}
 
 	@SuppressWarnings("unchecked")
-	private void setPortProperty(ConfigurableEnvironment environment, String propertyName,
-			int port) {
+	private void setPortProperty(ConfigurableEnvironment environment, String propertyName, int port) {
 		MutablePropertySources sources = environment.getPropertySources();
 		PropertySource<?> source = sources.get("server.ports");
 		if (source == null) {

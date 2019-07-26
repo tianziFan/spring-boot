@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -30,6 +30,8 @@ import org.springframework.core.io.support.SpringFactoriesLoader;
  *
  * @author Phillip Webb
  * @author Dave Syer
+ * @author Andy Wilkinson
+ * @since 1.0.0
  */
 public interface SpringApplicationRunListener {
 
@@ -37,35 +39,61 @@ public interface SpringApplicationRunListener {
 	 * Called immediately when the run method has first started. Can be used for very
 	 * early initialization.
 	 */
-	void starting();
+	default void starting() {
+	}
 
 	/**
 	 * Called once the environment has been prepared, but before the
 	 * {@link ApplicationContext} has been created.
 	 * @param environment the environment
 	 */
-	void environmentPrepared(ConfigurableEnvironment environment);
+	default void environmentPrepared(ConfigurableEnvironment environment) {
+	}
 
 	/**
 	 * Called once the {@link ApplicationContext} has been created and prepared, but
 	 * before sources have been loaded.
 	 * @param context the application context
 	 */
-	void contextPrepared(ConfigurableApplicationContext context);
+	default void contextPrepared(ConfigurableApplicationContext context) {
+	}
 
 	/**
 	 * Called once the application context has been loaded but before it has been
 	 * refreshed.
 	 * @param context the application context
 	 */
-	void contextLoaded(ConfigurableApplicationContext context);
+	default void contextLoaded(ConfigurableApplicationContext context) {
+	}
 
 	/**
-	 * Called immediately before the run method finishes.
-	 * @param context the application context or null if a failure occurred before the
-	 * context was created
-	 * @param exception any run exception or null if run completed successfully.
+	 * The context has been refreshed and the application has started but
+	 * {@link CommandLineRunner CommandLineRunners} and {@link ApplicationRunner
+	 * ApplicationRunners} have not been called.
+	 * @param context the application context.
+	 * @since 2.0.0
 	 */
-	void finished(ConfigurableApplicationContext context, Throwable exception);
+	default void started(ConfigurableApplicationContext context) {
+	}
+
+	/**
+	 * Called immediately before the run method finishes, when the application context has
+	 * been refreshed and all {@link CommandLineRunner CommandLineRunners} and
+	 * {@link ApplicationRunner ApplicationRunners} have been called.
+	 * @param context the application context.
+	 * @since 2.0.0
+	 */
+	default void running(ConfigurableApplicationContext context) {
+	}
+
+	/**
+	 * Called when a failure occurs when running the application.
+	 * @param context the application context or {@code null} if a failure occurred before
+	 * the context was created
+	 * @param exception the failure
+	 * @since 2.0.0
+	 */
+	default void failed(ConfigurableApplicationContext context, Throwable exception) {
+	}
 
 }

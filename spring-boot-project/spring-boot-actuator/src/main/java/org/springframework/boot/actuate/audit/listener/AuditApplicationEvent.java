@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,7 +16,7 @@
 
 package org.springframework.boot.actuate.audit.listener;
 
-import java.util.Date;
+import java.time.Instant;
 import java.util.Map;
 
 import org.springframework.boot.actuate.audit.AuditEvent;
@@ -27,6 +27,7 @@ import org.springframework.util.Assert;
  * Spring {@link ApplicationEvent} to encapsulate {@link AuditEvent}s.
  *
  * @author Dave Syer
+ * @since 1.0.0
  */
 public class AuditApplicationEvent extends ApplicationEvent {
 
@@ -40,8 +41,7 @@ public class AuditApplicationEvent extends ApplicationEvent {
 	 * @param data the event data
 	 * @see AuditEvent#AuditEvent(String, String, Map)
 	 */
-	public AuditApplicationEvent(String principal, String type,
-			Map<String, Object> data) {
+	public AuditApplicationEvent(String principal, String type, Map<String, Object> data) {
 		this(new AuditEvent(principal, type, data));
 	}
 
@@ -60,14 +60,13 @@ public class AuditApplicationEvent extends ApplicationEvent {
 	/**
 	 * Create a new {@link AuditApplicationEvent} that wraps a newly created
 	 * {@link AuditEvent}.
-	 * @param timestamp the time stamp
+	 * @param timestamp the timestamp
 	 * @param principal the principal
 	 * @param type the event type
 	 * @param data the event data
-	 * @see AuditEvent#AuditEvent(Date, String, String, Map)
+	 * @see AuditEvent#AuditEvent(Instant, String, String, Map)
 	 */
-	public AuditApplicationEvent(Date timestamp, String principal, String type,
-			Map<String, Object> data) {
+	public AuditApplicationEvent(Instant timestamp, String principal, String type, Map<String, Object> data) {
 		this(new AuditEvent(timestamp, principal, type, data));
 	}
 

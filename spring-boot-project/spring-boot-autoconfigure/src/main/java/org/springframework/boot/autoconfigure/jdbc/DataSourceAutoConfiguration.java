@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,7 +19,6 @@ package org.springframework.boot.autoconfigure.jdbc;
 import javax.sql.DataSource;
 import javax.sql.XADataSource;
 
-import org.springframework.beans.factory.BeanFactoryUtils;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.AnyNestedCondition;
 import org.springframework.boot.autoconfigure.condition.ConditionMessage;
@@ -37,8 +36,6 @@ import org.springframework.context.annotation.ConditionContext;
 import org.springframework.context.annotation.Conditional;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
-import org.springframework.core.Ordered;
-import org.springframework.core.annotation.Order;
 import org.springframework.core.type.AnnotatedTypeMetadata;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseType;
 
@@ -49,15 +46,15 @@ import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseType;
  * @author Phillip Webb
  * @author Stephane Nicoll
  * @author Kazuki Shimizu
+ * @since 1.0.0
  */
-@Configuration
+@Configuration(proxyBeanMethods = false)
 @ConditionalOnClass({ DataSource.class, EmbeddedDatabaseType.class })
 @EnableConfigurationProperties(DataSourceProperties.class)
-@Import({ DataSourcePoolMetadataProvidersConfiguration.class,
-		DataSourceInitializationConfiguration.class })
+@Import({ DataSourcePoolMetadataProvidersConfiguration.class, DataSourceInitializationConfiguration.class })
 public class DataSourceAutoConfiguration {
 
-	@Configuration
+	@Configuration(proxyBeanMethods = false)
 	@Conditional(EmbeddedDatabaseCondition.class)
 	@ConditionalOnMissingBean({ DataSource.class, XADataSource.class })
 	@Import(EmbeddedDataSourceConfiguration.class)
@@ -65,7 +62,7 @@ public class DataSourceAutoConfiguration {
 
 	}
 
-	@Configuration
+	@Configuration(proxyBeanMethods = false)
 	@Conditional(PooledDataSourceCondition.class)
 	@ConditionalOnMissingBean({ DataSource.class, XADataSource.class })
 	@Import({ DataSourceConfiguration.Hikari.class, DataSourceConfiguration.Tomcat.class,
@@ -103,28 +100,12 @@ public class DataSourceAutoConfiguration {
 	static class PooledDataSourceAvailableCondition extends SpringBootCondition {
 
 		@Override
-		public ConditionOutcome getMatchOutcome(ConditionContext context,
-				AnnotatedTypeMetadata metadata) {
-			ConditionMessage.Builder message = ConditionMessage
-					.forCondition("PooledDataSource");
-			if (getDataSourceClassLoader(context) != null) {
-				return ConditionOutcome
-						.match(message.foundExactly("supported DataSource"));
+		public ConditionOutcome getMatchOutcome(ConditionContext context, AnnotatedTypeMetadata metadata) {
+			ConditionMessage.Builder message = ConditionMessage.forCondition("PooledDataSource");
+			if (DataSourceBuilder.findType(context.getClassLoader()) != null) {
+				return ConditionOutcome.match(message.foundExactly("supported DataSource"));
 			}
-			return ConditionOutcome
-					.noMatch(message.didNotFind("supported DataSource").atAll());
-		}
-
-		/**
-		 * Returns the class loader for the {@link DataSource} class. Used to ensure that
-		 * the driver class can actually be loaded by the data source.
-		 * @param context the condition context
-		 * @return the class loader
-		 */
-		private ClassLoader getDataSourceClassLoader(ConditionContext context) {
-			Class<?> dataSourceClass = DataSourceBuilder
-					.findType(context.getClassLoader());
-			return (dataSourceClass == null ? null : dataSourceClass.getClassLoader());
+			return ConditionOutcome.noMatch(message.didNotFind("supported DataSource").atAll());
 		}
 
 	}
@@ -139,58 +120,16 @@ public class DataSourceAutoConfiguration {
 		private final SpringBootCondition pooledCondition = new PooledDataSourceCondition();
 
 		@Override
-		public ConditionOutcome getMatchOutcome(ConditionContext context,
-				AnnotatedTypeMetadata metadata) {
-			ConditionMessage.Builder message = ConditionMessage
-					.forCondition("EmbeddedDataSource");
+		public ConditionOutcome getMatchOutcome(ConditionContext context, AnnotatedTypeMetadata metadata) {
+			ConditionMessage.Builder message = ConditionMessage.forCondition("EmbeddedDataSource");
 			if (anyMatches(context, metadata, this.pooledCondition)) {
-				return ConditionOutcome
-						.noMatch(message.foundExactly("supported pooled data source"));
+				return ConditionOutcome.noMatch(message.foundExactly("supported pooled data source"));
 			}
-			EmbeddedDatabaseType type = EmbeddedDatabaseConnection
-					.get(context.getClassLoader()).getType();
+			EmbeddedDatabaseType type = EmbeddedDatabaseConnection.get(context.getClassLoader()).getType();
 			if (type == null) {
-				return ConditionOutcome
-						.noMatch(message.didNotFind("embedded database").atAll());
+				return ConditionOutcome.noMatch(message.didNotFind("embedded database").atAll());
 			}
 			return ConditionOutcome.match(message.found("embedded database").items(type));
-		}
-
-	}
-
-	/**
-	 * {@link Condition} to detect when a {@link DataSource} is available (either because
-	 * the user provided one or because one will be auto-configured).
-	 */
-	@Order(Ordered.LOWEST_PRECEDENCE - 10)
-	static class DataSourceAvailableCondition extends SpringBootCondition {
-
-		private final SpringBootCondition pooledCondition = new PooledDataSourceCondition();
-
-		private final SpringBootCondition embeddedCondition = new EmbeddedDatabaseCondition();
-
-		@Override
-		public ConditionOutcome getMatchOutcome(ConditionContext context,
-				AnnotatedTypeMetadata metadata) {
-			ConditionMessage.Builder message = ConditionMessage
-					.forCondition("DataSourceAvailable");
-			if (hasBean(context, DataSource.class)
-					|| hasBean(context, XADataSource.class)) {
-				return ConditionOutcome
-						.match(message.foundExactly("existing data source bean"));
-			}
-			if (anyMatches(context, metadata, this.pooledCondition,
-					this.embeddedCondition)) {
-				return ConditionOutcome.match(message
-						.foundExactly("existing auto-configured data source bean"));
-			}
-			return ConditionOutcome
-					.noMatch(message.didNotFind("any existing data source bean").atAll());
-		}
-
-		private boolean hasBean(ConditionContext context, Class<?> type) {
-			return BeanFactoryUtils.beanNamesForTypeIncludingAncestors(
-					context.getBeanFactory(), type, true, false).length > 0;
 		}
 
 	}

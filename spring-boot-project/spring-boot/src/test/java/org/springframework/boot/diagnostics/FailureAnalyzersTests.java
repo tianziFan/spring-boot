@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,13 +20,15 @@ import java.io.IOException;
 import java.net.URL;
 import java.util.Enumeration;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.BeanFactoryAware;
+import org.springframework.context.EnvironmentAware;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+import org.springframework.core.env.Environment;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -37,39 +39,47 @@ import static org.mockito.Mockito.verify;
  * Tests for {@link FailureAnalyzers}.
  *
  * @author Andy Wilkinson
+ * @author Stephane Nicoll
  */
-public class FailureAnalyzersTests {
+class FailureAnalyzersTests {
 
-	private static BeanFactoryAwareFailureAnalyzer failureAnalyzer;
+	private static AwareFailureAnalyzer failureAnalyzer;
 
-	@Before
-	public void configureMock() {
-		failureAnalyzer = mock(BeanFactoryAwareFailureAnalyzer.class);
+	@BeforeEach
+	void configureMock() {
+		failureAnalyzer = mock(AwareFailureAnalyzer.class);
 	}
 
 	@Test
-	public void analyzersAreLoadedAndCalled() {
+	void analyzersAreLoadedAndCalled() {
 		RuntimeException failure = new RuntimeException();
 		analyzeAndReport("basic.factories", failure);
 		verify(failureAnalyzer, times(2)).analyze(failure);
 	}
 
 	@Test
-	public void beanFactoryIsInjectedIntoBeanFactoryAwareFailureAnalyzers() {
+	void beanFactoryIsInjectedIntoBeanFactoryAwareFailureAnalyzers() {
 		RuntimeException failure = new RuntimeException();
 		analyzeAndReport("basic.factories", failure);
 		verify(failureAnalyzer).setBeanFactory(any(BeanFactory.class));
 	}
 
 	@Test
-	public void analyzerThatFailsDuringInitializationDoesNotPreventOtherAnalyzersFromBeingCalled() {
+	void environmentIsInjectedIntoEnvironmentAwareFailureAnalyzers() {
+		RuntimeException failure = new RuntimeException();
+		analyzeAndReport("basic.factories", failure);
+		verify(failureAnalyzer).setEnvironment(any(Environment.class));
+	}
+
+	@Test
+	void analyzerThatFailsDuringInitializationDoesNotPreventOtherAnalyzersFromBeingCalled() {
 		RuntimeException failure = new RuntimeException();
 		analyzeAndReport("broken-initialization.factories", failure);
 		verify(failureAnalyzer, times(1)).analyze(failure);
 	}
 
 	@Test
-	public void analyzerThatFailsDuringAnalysisDoesNotPreventOtherAnalyzersFromBeingCalled() {
+	void analyzerThatFailsDuringAnalysisDoesNotPreventOtherAnalyzersFromBeingCalled() {
 		RuntimeException failure = new RuntimeException();
 		analyzeAndReport("broken-analysis.factories", failure);
 		verify(failureAnalyzer, times(1)).analyze(failure);
@@ -113,12 +123,16 @@ public class FailureAnalyzersTests {
 
 	}
 
-	interface BeanFactoryAwareFailureAnalyzer extends BeanFactoryAware, FailureAnalyzer {
+	interface AwareFailureAnalyzer extends BeanFactoryAware, EnvironmentAware, FailureAnalyzer {
 
 	}
 
-	static class StandardBeanFactoryAwareFailureAnalyzer extends BasicFailureAnalyzer
-			implements BeanFactoryAwareFailureAnalyzer {
+	static class StandardAwareFailureAnalyzer extends BasicFailureAnalyzer implements AwareFailureAnalyzer {
+
+		@Override
+		public void setEnvironment(Environment environment) {
+			failureAnalyzer.setEnvironment(environment);
+		}
 
 		@Override
 		public void setBeanFactory(BeanFactory beanFactory) throws BeansException {
@@ -139,8 +153,7 @@ public class FailureAnalyzersTests {
 		@Override
 		public Enumeration<URL> getResources(String name) throws IOException {
 			if ("META-INF/spring.factories".equals(name)) {
-				return super.getResources(
-						"failure-analyzers-tests/" + this.factoriesName);
+				return super.getResources("failure-analyzers-tests/" + this.factoriesName);
 			}
 			return super.getResources(name);
 		}

@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,7 +17,7 @@
 package org.springframework.boot.autoconfigure.web.servlet.error;
 
 import java.util.Collections;
-import java.util.HashMap;
+import java.util.EnumMap;
 import java.util.Map;
 
 import javax.servlet.http.HttpServletRequest;
@@ -60,7 +60,7 @@ public class DefaultErrorViewResolver implements ErrorViewResolver, Ordered {
 	private static final Map<Series, String> SERIES_VIEWS;
 
 	static {
-		Map<Series, String> views = new HashMap<>();
+		Map<Series, String> views = new EnumMap<>(Series.class);
 		views.put(Series.CLIENT_ERROR, "4xx");
 		views.put(Series.SERVER_ERROR, "5xx");
 		SERIES_VIEWS = Collections.unmodifiableMap(views);
@@ -79,18 +79,15 @@ public class DefaultErrorViewResolver implements ErrorViewResolver, Ordered {
 	 * @param applicationContext the source application context
 	 * @param resourceProperties resource properties
 	 */
-	public DefaultErrorViewResolver(ApplicationContext applicationContext,
-			ResourceProperties resourceProperties) {
+	public DefaultErrorViewResolver(ApplicationContext applicationContext, ResourceProperties resourceProperties) {
 		Assert.notNull(applicationContext, "ApplicationContext must not be null");
 		Assert.notNull(resourceProperties, "ResourceProperties must not be null");
 		this.applicationContext = applicationContext;
 		this.resourceProperties = resourceProperties;
-		this.templateAvailabilityProviders = new TemplateAvailabilityProviders(
-				applicationContext);
+		this.templateAvailabilityProviders = new TemplateAvailabilityProviders(applicationContext);
 	}
 
-	DefaultErrorViewResolver(ApplicationContext applicationContext,
-			ResourceProperties resourceProperties,
+	DefaultErrorViewResolver(ApplicationContext applicationContext, ResourceProperties resourceProperties,
 			TemplateAvailabilityProviders templateAvailabilityProviders) {
 		Assert.notNull(applicationContext, "ApplicationContext must not be null");
 		Assert.notNull(resourceProperties, "ResourceProperties must not be null");
@@ -100,9 +97,8 @@ public class DefaultErrorViewResolver implements ErrorViewResolver, Ordered {
 	}
 
 	@Override
-	public ModelAndView resolveErrorView(HttpServletRequest request, HttpStatus status,
-			Map<String, Object> model) {
-		ModelAndView modelAndView = resolve(String.valueOf(status), model);
+	public ModelAndView resolveErrorView(HttpServletRequest request, HttpStatus status, Map<String, Object> model) {
+		ModelAndView modelAndView = resolve(String.valueOf(status.value()), model);
 		if (modelAndView == null && SERIES_VIEWS.containsKey(status.series())) {
 			modelAndView = resolve(SERIES_VIEWS.get(status.series()), model);
 		}
@@ -111,8 +107,8 @@ public class DefaultErrorViewResolver implements ErrorViewResolver, Ordered {
 
 	private ModelAndView resolve(String viewName, Map<String, Object> model) {
 		String errorViewName = "error/" + viewName;
-		TemplateAvailabilityProvider provider = this.templateAvailabilityProviders
-				.getProvider(errorViewName, this.applicationContext);
+		TemplateAvailabilityProvider provider = this.templateAvailabilityProviders.getProvider(errorViewName,
+				this.applicationContext);
 		if (provider != null) {
 			return new ModelAndView(errorViewName, model);
 		}
@@ -160,11 +156,10 @@ public class DefaultErrorViewResolver implements ErrorViewResolver, Ordered {
 		}
 
 		@Override
-		public void render(Map<String, ?> model, HttpServletRequest request,
-				HttpServletResponse response) throws Exception {
+		public void render(Map<String, ?> model, HttpServletRequest request, HttpServletResponse response)
+				throws Exception {
 			response.setContentType(getContentType());
-			FileCopyUtils.copy(this.resource.getInputStream(),
-					response.getOutputStream());
+			FileCopyUtils.copy(this.resource.getInputStream(), response.getOutputStream());
 		}
 
 	}

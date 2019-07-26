@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -40,17 +40,16 @@ import org.springframework.web.context.WebApplicationContext;
  * @see ServletComponentScan
  * @see ServletComponentScanRegistrar
  */
-class ServletComponentRegisteringPostProcessor
-		implements BeanFactoryPostProcessor, ApplicationContextAware {
+class ServletComponentRegisteringPostProcessor implements BeanFactoryPostProcessor, ApplicationContextAware {
 
-	private static final List<ServletComponentHandler> handlers;
+	private static final List<ServletComponentHandler> HANDLERS;
 
 	static {
 		List<ServletComponentHandler> servletComponentHandlers = new ArrayList<>();
 		servletComponentHandlers.add(new WebServletHandler());
 		servletComponentHandlers.add(new WebFilterHandler());
 		servletComponentHandlers.add(new WebListenerHandler());
-		handlers = Collections.unmodifiableList(servletComponentHandlers);
+		HANDLERS = Collections.unmodifiableList(servletComponentHandlers);
 	}
 
 	private final Set<String> packagesToScan;
@@ -62,8 +61,7 @@ class ServletComponentRegisteringPostProcessor
 	}
 
 	@Override
-	public void postProcessBeanFactory(ConfigurableListableBeanFactory beanFactory)
-			throws BeansException {
+	public void postProcessBeanFactory(ConfigurableListableBeanFactory beanFactory) throws BeansException {
 		if (isRunningInEmbeddedWebServer()) {
 			ClassPathScanningCandidateComponentProvider componentProvider = createComponentProvider();
 			for (String packageToScan : this.packagesToScan) {
@@ -72,13 +70,10 @@ class ServletComponentRegisteringPostProcessor
 		}
 	}
 
-	private void scanPackage(
-			ClassPathScanningCandidateComponentProvider componentProvider,
-			String packageToScan) {
-		for (BeanDefinition candidate : componentProvider
-				.findCandidateComponents(packageToScan)) {
+	private void scanPackage(ClassPathScanningCandidateComponentProvider componentProvider, String packageToScan) {
+		for (BeanDefinition candidate : componentProvider.findCandidateComponents(packageToScan)) {
 			if (candidate instanceof ScannedGenericBeanDefinition) {
-				for (ServletComponentHandler handler : handlers) {
+				for (ServletComponentHandler handler : HANDLERS) {
 					handler.handle(((ScannedGenericBeanDefinition) candidate),
 							(BeanDefinitionRegistry) this.applicationContext);
 				}
@@ -88,8 +83,7 @@ class ServletComponentRegisteringPostProcessor
 
 	private boolean isRunningInEmbeddedWebServer() {
 		return this.applicationContext instanceof WebApplicationContext
-				&& ((WebApplicationContext) this.applicationContext)
-						.getServletContext() == null;
+				&& ((WebApplicationContext) this.applicationContext).getServletContext() == null;
 	}
 
 	private ClassPathScanningCandidateComponentProvider createComponentProvider() {
@@ -97,7 +91,7 @@ class ServletComponentRegisteringPostProcessor
 				false);
 		componentProvider.setEnvironment(this.applicationContext.getEnvironment());
 		componentProvider.setResourceLoader(this.applicationContext);
-		for (ServletComponentHandler handler : handlers) {
+		for (ServletComponentHandler handler : HANDLERS) {
 			componentProvider.addIncludeFilter(handler.getTypeFilter());
 		}
 		return componentProvider;
@@ -108,8 +102,7 @@ class ServletComponentRegisteringPostProcessor
 	}
 
 	@Override
-	public void setApplicationContext(ApplicationContext applicationContext)
-			throws BeansException {
+	public void setApplicationContext(ApplicationContext applicationContext) throws BeansException {
 		this.applicationContext = applicationContext;
 	}
 

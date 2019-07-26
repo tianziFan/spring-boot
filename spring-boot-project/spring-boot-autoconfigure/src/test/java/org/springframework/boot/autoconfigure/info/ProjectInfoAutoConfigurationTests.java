@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,17 +16,15 @@
 
 package org.springframework.boot.autoconfigure.info;
 
-import java.util.Map;
 import java.util.Properties;
 
-import org.junit.After;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
+import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.autoconfigure.context.PropertyPlaceholderAutoConfiguration;
 import org.springframework.boot.info.BuildProperties;
 import org.springframework.boot.info.GitProperties;
-import org.springframework.boot.test.util.TestPropertyValues;
-import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -37,125 +35,128 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * @author Stephane Nicoll
  */
-public class ProjectInfoAutoConfigurationTests {
+class ProjectInfoAutoConfigurationTests {
 
-	private AnnotationConfigApplicationContext context;
+	private ApplicationContextRunner contextRunner = new ApplicationContextRunner().withConfiguration(
+			AutoConfigurations.of(PropertyPlaceholderAutoConfiguration.class, ProjectInfoAutoConfiguration.class));
 
-	@After
-	public void close() {
-		if (this.context != null) {
-			this.context.close();
-		}
+	@Test
+	void gitPropertiesUnavailableIfResourceNotAvailable() {
+		this.contextRunner.run((context) -> assertThat(context.getBeansOfType(GitProperties.class)).isEmpty());
 	}
 
 	@Test
-	public void gitPropertiesUnavailableIfResourceNotAvailable() {
-		load();
-		Map<String, GitProperties> beans = this.context
-				.getBeansOfType(GitProperties.class);
-		assertThat(beans).hasSize(0);
+	void gitPropertiesWithNoData() {
+		this.contextRunner
+				.withPropertyValues("spring.info.git.location="
+						+ "classpath:/org/springframework/boot/autoconfigure/info/git-no-data.properties")
+				.run((context) -> {
+					GitProperties gitProperties = context.getBean(GitProperties.class);
+					assertThat(gitProperties.getBranch()).isNull();
+				});
 	}
 
 	@Test
-	public void gitLocationTakesPrecedenceOverLegacyKey() {
-		load("spring.info.git.location=classpath:/org/springframework/boot/autoconfigure/info/git.properties",
-				"spring.git.properties=classpath:/org/springframework/boot/autoconfigure/info/git-no-data.properties");
-		GitProperties gitProperties = this.context.getBean(GitProperties.class);
-		assertThat(gitProperties.getBranch()).isNull();
-		assertThat(gitProperties.getCommitId())
-				.isEqualTo("f95038ec09e29d8f91982fd1cbcc0f3b131b1d0a");
-		assertThat(gitProperties.getCommitTime().getTime()).isEqualTo(1456995720000L);
+	void gitPropertiesFallbackWithGitPropertiesBean() {
+		this.contextRunner.withUserConfiguration(CustomInfoPropertiesConfiguration.class).withPropertyValues(
+				"spring.info.git.location=classpath:/org/springframework/boot/autoconfigure/info/git.properties")
+				.run((context) -> {
+					GitProperties gitProperties = context.getBean(GitProperties.class);
+					assertThat(gitProperties).isSameAs(context.getBean("customGitProperties"));
+				});
 	}
 
 	@Test
-	public void gitLegacyKeyIsUsedAsFallback() {
-		load("spring.git.properties=classpath:/org/springframework/boot/autoconfigure/info/git-epoch.properties");
-		GitProperties gitProperties = this.context.getBean(GitProperties.class);
-		assertThat(gitProperties.getBranch()).isEqualTo("master");
-		assertThat(gitProperties.getCommitId())
-				.isEqualTo("5009933788f5f8c687719de6a697074ff80b1b69");
-		assertThat(gitProperties.getCommitTime().getTime()).isEqualTo(1457103850000L);
+	void gitPropertiesUsesUtf8ByDefault() {
+		this.contextRunner.withPropertyValues(
+				"spring.info.git.location=classpath:/org/springframework/boot/autoconfigure/info/git.properties")
+				.run((context) -> {
+					GitProperties gitProperties = context.getBean(GitProperties.class);
+					assertThat(gitProperties.get("commit.charset")).isEqualTo("test™");
+				});
 	}
 
 	@Test
-	public void gitPropertiesWithNoData() {
-		load("spring.info.git.location=classpath:/org/springframework/boot/autoconfigure/info/git-no-data.properties");
-		GitProperties gitProperties = this.context.getBean(GitProperties.class);
-		assertThat(gitProperties.getBranch()).isNull();
+	void gitPropertiesEncodingCanBeConfigured() {
+		this.contextRunner.withPropertyValues("spring.info.git.encoding=US-ASCII",
+				"spring.info.git.location=classpath:/org/springframework/boot/autoconfigure/info/git.properties")
+				.run((context) -> {
+					GitProperties gitProperties = context.getBean(GitProperties.class);
+					assertThat(gitProperties.get("commit.charset")).isNotEqualTo("test™");
+				});
 	}
 
 	@Test
-	public void gitPropertiesFallbackWithGitPropertiesBean() {
-		load(CustomInfoPropertiesConfiguration.class,
-				"spring.info.git.location=classpath:/org/springframework/boot/autoconfigure/info/git.properties");
-		GitProperties gitProperties = this.context.getBean(GitProperties.class);
-		assertThat(gitProperties).isSameAs(this.context.getBean("customGitProperties"));
+	void buildPropertiesDefaultLocation() {
+		this.contextRunner.run((context) -> {
+			BuildProperties buildProperties = context.getBean(BuildProperties.class);
+			assertThat(buildProperties.getGroup()).isEqualTo("com.example");
+			assertThat(buildProperties.getArtifact()).isEqualTo("demo");
+			assertThat(buildProperties.getName()).isEqualTo("Demo Project");
+			assertThat(buildProperties.getVersion()).isEqualTo("0.0.1-SNAPSHOT");
+			assertThat(buildProperties.getTime().toEpochMilli()).isEqualTo(1457100965000L);
+		});
 	}
 
 	@Test
-	public void buildPropertiesDefaultLocation() {
-		load();
-		BuildProperties buildProperties = this.context.getBean(BuildProperties.class);
-		assertThat(buildProperties.getGroup()).isEqualTo("com.example");
-		assertThat(buildProperties.getArtifact()).isEqualTo("demo");
-		assertThat(buildProperties.getName()).isEqualTo("Demo Project");
-		assertThat(buildProperties.getVersion()).isEqualTo("0.0.1-SNAPSHOT");
-		assertThat(buildProperties.getTime().getTime()).isEqualTo(1457100965000L);
+	void buildPropertiesCustomLocation() {
+		this.contextRunner
+				.withPropertyValues("spring.info.build.location="
+						+ "classpath:/org/springframework/boot/autoconfigure/info/build-info.properties")
+				.run((context) -> {
+					BuildProperties buildProperties = context.getBean(BuildProperties.class);
+					assertThat(buildProperties.getGroup()).isEqualTo("com.example.acme");
+					assertThat(buildProperties.getArtifact()).isEqualTo("acme");
+					assertThat(buildProperties.getName()).isEqualTo("acme");
+					assertThat(buildProperties.getVersion()).isEqualTo("1.0.1-SNAPSHOT");
+					assertThat(buildProperties.getTime().toEpochMilli()).isEqualTo(1457088120000L);
+				});
 	}
 
 	@Test
-	public void buildPropertiesCustomLocation() {
-		load("spring.info.build.location=classpath:/org/springframework/boot/autoconfigure/info/build-info.properties");
-		BuildProperties buildProperties = this.context.getBean(BuildProperties.class);
-		assertThat(buildProperties.getGroup()).isEqualTo("com.example.acme");
-		assertThat(buildProperties.getArtifact()).isEqualTo("acme");
-		assertThat(buildProperties.getName()).isEqualTo("acme");
-		assertThat(buildProperties.getVersion()).isEqualTo("1.0.1-SNAPSHOT");
-		assertThat(buildProperties.getTime().getTime()).isEqualTo(1457088120000L);
+	void buildPropertiesCustomInvalidLocation() {
+		this.contextRunner.withPropertyValues("spring.info.build.location=classpath:/org/acme/no-build-info.properties")
+				.run((context) -> assertThat(context.getBeansOfType(BuildProperties.class)).hasSize(0));
 	}
 
 	@Test
-	public void buildPropertiesCustomInvalidLocation() {
-		load("spring.info.build.location=classpath:/org/acme/no-build-info.properties");
-		Map<String, BuildProperties> beans = this.context
-				.getBeansOfType(BuildProperties.class);
-		assertThat(beans).hasSize(0);
+	void buildPropertiesFallbackWithBuildInfoBean() {
+		this.contextRunner.withUserConfiguration(CustomInfoPropertiesConfiguration.class).run((context) -> {
+			BuildProperties buildProperties = context.getBean(BuildProperties.class);
+			assertThat(buildProperties).isSameAs(context.getBean("customBuildProperties"));
+		});
 	}
 
 	@Test
-	public void buildPropertiesFallbackWithBuildInfoBean() {
-		load(CustomInfoPropertiesConfiguration.class);
-		BuildProperties buildProperties = this.context.getBean(BuildProperties.class);
-		assertThat(buildProperties)
-				.isSameAs(this.context.getBean("customBuildProperties"));
+	void buildPropertiesUsesUtf8ByDefault() {
+		this.contextRunner.withPropertyValues(
+				"spring.info.build.location=classpath:/org/springframework/boot/autoconfigure/info/build-info.properties")
+				.run((context) -> {
+					BuildProperties buildProperties = context.getBean(BuildProperties.class);
+					assertThat(buildProperties.get("charset")).isEqualTo("test™");
+				});
 	}
 
-	private void load(String... environment) {
-		load(null, environment);
+	@Test
+	void buildPropertiesEncodingCanBeConfigured() {
+		this.contextRunner.withPropertyValues("spring.info.build.encoding=US-ASCII",
+				"spring.info.build.location=classpath:/org/springframework/boot/autoconfigure/info/build-info.properties")
+				.run((context) -> {
+					BuildProperties buildProperties = context.getBean(BuildProperties.class);
+					assertThat(buildProperties.get("charset")).isNotEqualTo("test™");
+				});
 	}
 
-	private void load(Class<?> config, String... environment) {
-		AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext();
-		if (config != null) {
-			context.register(config);
-		}
-		context.register(PropertyPlaceholderAutoConfiguration.class,
-				ProjectInfoAutoConfiguration.class);
-		TestPropertyValues.of(environment).applyTo(context);
-		context.refresh();
-		this.context = context;
-	}
-
-	@Configuration
+	@Configuration(proxyBeanMethods = false)
 	static class CustomInfoPropertiesConfiguration {
 
 		@Bean
-		public GitProperties customGitProperties() {
+		GitProperties customGitProperties() {
 			return new GitProperties(new Properties());
 		}
 
 		@Bean
-		public BuildProperties customBuildProperties() {
+		BuildProperties customBuildProperties() {
 			return new BuildProperties(new Properties());
 		}
 

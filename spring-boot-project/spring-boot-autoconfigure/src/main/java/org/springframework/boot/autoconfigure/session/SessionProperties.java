@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,14 +16,21 @@
 
 package org.springframework.boot.autoconfigure.session;
 
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 
+import javax.annotation.PostConstruct;
+
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.web.ServerProperties;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.convert.DurationUnit;
 import org.springframework.boot.web.servlet.DispatcherType;
+import org.springframework.boot.web.servlet.server.Session;
 import org.springframework.session.web.http.SessionRepositoryFilter;
 
 /**
@@ -42,13 +49,26 @@ public class SessionProperties {
 	 */
 	private StoreType storeType;
 
-	private final Integer timeout;
+	/**
+	 * Session timeout. If a duration suffix is not specified, seconds will be used.
+	 */
+	@DurationUnit(ChronoUnit.SECONDS)
+	private Duration timeout;
 
 	private Servlet servlet = new Servlet();
 
-	public SessionProperties(ObjectProvider<ServerProperties> serverProperties) {
-		ServerProperties properties = serverProperties.getIfUnique();
-		this.timeout = (properties != null ? properties.getSession().getTimeout() : null);
+	private ServerProperties serverProperties;
+
+	@Autowired
+	void setServerProperties(ObjectProvider<ServerProperties> serverProperties) {
+		this.serverProperties = serverProperties.getIfUnique();
+	}
+
+	@PostConstruct
+	public void checkSessionTimeout() {
+		if (this.timeout == null && this.serverProperties != null) {
+			this.timeout = this.serverProperties.getServlet().getSession().getTimeout();
+		}
 	}
 
 	public StoreType getStoreType() {
@@ -60,12 +80,16 @@ public class SessionProperties {
 	}
 
 	/**
-	 * Return the session timeout in seconds.
-	 * @return the session timeout in seconds
-	 * @see ServerProperties#getSession()
+	 * Return the session timeout.
+	 * @return the session timeout
+	 * @see Session#getTimeout()
 	 */
-	public Integer getTimeout() {
+	public Duration getTimeout() {
 		return this.timeout;
+	}
+
+	public void setTimeout(Duration timeout) {
+		this.timeout = timeout;
 	}
 
 	public Servlet getServlet() {
@@ -89,8 +113,8 @@ public class SessionProperties {
 		/**
 		 * Session repository filter dispatcher types.
 		 */
-		private Set<DispatcherType> filterDispatcherTypes = new HashSet<>(Arrays.asList(
-				DispatcherType.ASYNC, DispatcherType.ERROR, DispatcherType.REQUEST));
+		private Set<DispatcherType> filterDispatcherTypes = new HashSet<>(
+				Arrays.asList(DispatcherType.ASYNC, DispatcherType.ERROR, DispatcherType.REQUEST));
 
 		public int getFilterOrder() {
 			return this.filterOrder;

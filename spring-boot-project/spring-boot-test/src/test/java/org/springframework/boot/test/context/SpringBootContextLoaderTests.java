@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,8 +18,8 @@ package org.springframework.boot.test.context;
 
 import java.util.Map;
 
-import org.junit.Ignore;
-import org.junit.Test;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.context.annotation.Configuration;
 import org.springframework.test.context.ContextConfiguration;
@@ -36,67 +36,63 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * @author Stephane Nicoll
  */
-public class SpringBootContextLoaderTests {
+class SpringBootContextLoaderTests {
 
 	@Test
-	public void environmentPropertiesSimple() throws Exception {
+	void environmentPropertiesSimple() {
 		Map<String, Object> config = getEnvironmentProperties(SimpleConfig.class);
 		assertKey(config, "key", "myValue");
 		assertKey(config, "anotherKey", "anotherValue");
 	}
 
 	@Test
-	public void environmentPropertiesSimpleNonAlias() throws Exception {
+	void environmentPropertiesSimpleNonAlias() {
 		Map<String, Object> config = getEnvironmentProperties(SimpleConfigNonAlias.class);
 		assertKey(config, "key", "myValue");
 		assertKey(config, "anotherKey", "anotherValue");
 	}
 
 	@Test
-	public void environmentPropertiesOverrideDefaults() throws Exception {
+	void environmentPropertiesOverrideDefaults() {
 		Map<String, Object> config = getEnvironmentProperties(OverrideConfig.class);
 		assertKey(config, "server.port", "2345");
 	}
 
 	@Test
-	public void environmentPropertiesAppend() throws Exception {
+	void environmentPropertiesAppend() {
 		Map<String, Object> config = getEnvironmentProperties(AppendConfig.class);
 		assertKey(config, "key", "myValue");
 		assertKey(config, "otherKey", "otherValue");
 	}
 
 	@Test
-	public void environmentPropertiesSeparatorInValue() throws Exception {
+	void environmentPropertiesSeparatorInValue() {
 		Map<String, Object> config = getEnvironmentProperties(SameSeparatorInValue.class);
 		assertKey(config, "key", "my=Value");
 		assertKey(config, "anotherKey", "another:Value");
 	}
 
 	@Test
-	public void environmentPropertiesAnotherSeparatorInValue() throws Exception {
-		Map<String, Object> config = getEnvironmentProperties(
-				AnotherSeparatorInValue.class);
+	void environmentPropertiesAnotherSeparatorInValue() {
+		Map<String, Object> config = getEnvironmentProperties(AnotherSeparatorInValue.class);
 		assertKey(config, "key", "my:Value");
 		assertKey(config, "anotherKey", "another=Value");
 	}
 
 	@Test
-	@Ignore
-	public void environmentPropertiesNewLineInValue() throws Exception {
+	@Disabled
+	void environmentPropertiesNewLineInValue() {
 		// gh-4384
 		Map<String, Object> config = getEnvironmentProperties(NewLineInValue.class);
 		assertKey(config, "key", "myValue");
 		assertKey(config, "variables", "foo=FOO\n bar=BAR");
 	}
 
-	private Map<String, Object> getEnvironmentProperties(Class<?> testClass)
-			throws Exception {
-		TestContext context = new ExposedTestContextManager(testClass)
-				.getExposedTestContext();
-		MergedContextConfiguration config = (MergedContextConfiguration) ReflectionTestUtils
-				.getField(context, "mergedContextConfiguration");
-		return TestPropertySourceUtils
-				.convertInlinedPropertiesToMap(config.getPropertySourceProperties());
+	private Map<String, Object> getEnvironmentProperties(Class<?> testClass) {
+		TestContext context = new ExposedTestContextManager(testClass).getExposedTestContext();
+		MergedContextConfiguration config = (MergedContextConfiguration) ReflectionTestUtils.getField(context,
+				"mergedContextConfiguration");
+		return TestPropertySourceUtils.convertInlinedPropertiesToMap(config.getPropertySourceProperties());
 	}
 
 	private void assertKey(Map<String, Object> actual, String key, Object value) {
@@ -146,7 +142,7 @@ public class SpringBootContextLoaderTests {
 
 	}
 
-	@Configuration
+	@Configuration(proxyBeanMethods = false)
 	static class Config {
 
 	}
@@ -154,13 +150,13 @@ public class SpringBootContextLoaderTests {
 	/**
 	 * {@link TestContextManager} which exposes the {@link TestContext}.
 	 */
-	private static class ExposedTestContextManager extends TestContextManager {
+	static class ExposedTestContextManager extends TestContextManager {
 
 		ExposedTestContextManager(Class<?> testClass) {
 			super(testClass);
 		}
 
-		public final TestContext getExposedTestContext() {
+		final TestContext getExposedTestContext() {
 			return super.getTestContext();
 		}
 

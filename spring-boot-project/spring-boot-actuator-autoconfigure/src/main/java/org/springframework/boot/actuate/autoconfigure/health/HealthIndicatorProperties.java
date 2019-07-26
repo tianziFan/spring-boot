@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -38,7 +38,7 @@ public class HealthIndicatorProperties {
 
 	/**
 	 * Mapping of health statuses to HTTP status codes. By default, registered health
-	 * statuses map to sensible defaults (i.e. UP maps to 200).
+	 * statuses map to sensible defaults (for example, UP maps to 200).
 	 */
 	private final Map<String, Integer> httpMapping = new HashMap<>();
 

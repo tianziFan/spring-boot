@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,7 +16,7 @@
 
 package org.springframework.boot.autoconfigure.elasticsearch.jest;
 
-import java.util.List;
+import java.time.Duration;
 
 import com.google.gson.Gson;
 import io.searchbox.client.JestClient;
@@ -29,76 +29,54 @@ import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.elasticsearch.jest.JestProperties.Proxy;
 import org.springframework.boot.autoconfigure.gson.GsonAutoConfiguration;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.context.properties.PropertyMapper;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.util.Assert;
-import org.springframework.util.StringUtils;
 
 /**
- * {@link EnableAutoConfiguration Auto-Configuration} for Jest.
+ * {@link EnableAutoConfiguration Auto-configuration} for Jest.
  *
  * @author Stephane Nicoll
  * @since 1.4.0
+ * @deprecated since 2.2.0 in favor of other auto-configured Elasticsearch clients
  */
-@Configuration
+@Configuration(proxyBeanMethods = false)
 @ConditionalOnClass(JestClient.class)
 @EnableConfigurationProperties(JestProperties.class)
 @AutoConfigureAfter(GsonAutoConfiguration.class)
+@Deprecated
 public class JestAutoConfiguration {
-
-	private final JestProperties properties;
-
-	private final ObjectProvider<Gson> gsonProvider;
-
-	private final List<HttpClientConfigBuilderCustomizer> builderCustomizers;
-
-	public JestAutoConfiguration(JestProperties properties, ObjectProvider<Gson> gson,
-			ObjectProvider<List<HttpClientConfigBuilderCustomizer>> builderCustomizers) {
-		this.properties = properties;
-		this.gsonProvider = gson;
-		this.builderCustomizers = builderCustomizers.getIfAvailable();
-	}
 
 	@Bean(destroyMethod = "shutdownClient")
 	@ConditionalOnMissingBean
-	public JestClient jestClient() {
+	public JestClient jestClient(JestProperties properties, ObjectProvider<Gson> gson,
+			ObjectProvider<HttpClientConfigBuilderCustomizer> builderCustomizers) {
 		JestClientFactory factory = new JestClientFactory();
-		factory.setHttpClientConfig(createHttpClientConfig());
+		factory.setHttpClientConfig(createHttpClientConfig(properties, gson, builderCustomizers));
 		return factory.getObject();
 	}
 
-	protected HttpClientConfig createHttpClientConfig() {
-		HttpClientConfig.Builder builder = new HttpClientConfig.Builder(
-				this.properties.getUris());
-		if (StringUtils.hasText(this.properties.getUsername())) {
-			builder.defaultCredentials(this.properties.getUsername(),
-					this.properties.getPassword());
-		}
-		String proxyHost = this.properties.getProxy().getHost();
-		if (StringUtils.hasText(proxyHost)) {
-			Integer proxyPort = this.properties.getProxy().getPort();
-			Assert.notNull(proxyPort, "Proxy port must not be null");
-			builder.proxy(new HttpHost(proxyHost, proxyPort));
-		}
-		Gson gson = this.gsonProvider.getIfUnique();
-		if (gson != null) {
-			builder.gson(gson);
-		}
-		builder.multiThreaded(this.properties.isMultiThreaded());
-		builder.connTimeout(this.properties.getConnectionTimeout())
-				.readTimeout(this.properties.getReadTimeout());
-		customize(builder);
+	protected HttpClientConfig createHttpClientConfig(JestProperties properties, ObjectProvider<Gson> gson,
+			ObjectProvider<HttpClientConfigBuilderCustomizer> builderCustomizers) {
+		HttpClientConfig.Builder builder = new HttpClientConfig.Builder(properties.getUris());
+		PropertyMapper map = PropertyMapper.get();
+		map.from(properties::getUsername).whenHasText()
+				.to((username) -> builder.defaultCredentials(username, properties.getPassword()));
+		Proxy proxy = properties.getProxy();
+		map.from(proxy::getHost).whenHasText().to((host) -> {
+			Assert.notNull(proxy.getPort(), "Proxy port must not be null");
+			builder.proxy(new HttpHost(host, proxy.getPort()));
+		});
+		map.from(gson::getIfUnique).whenNonNull().to(builder::gson);
+		map.from(properties::isMultiThreaded).to(builder::multiThreaded);
+		map.from(properties::getConnectionTimeout).whenNonNull().asInt(Duration::toMillis).to(builder::connTimeout);
+		map.from(properties::getReadTimeout).whenNonNull().asInt(Duration::toMillis).to(builder::readTimeout);
+		builderCustomizers.orderedStream().forEach((customizer) -> customizer.customize(builder));
 		return builder.build();
-	}
-
-	private void customize(HttpClientConfig.Builder builder) {
-		if (this.builderCustomizers != null) {
-			for (HttpClientConfigBuilderCustomizer customizer : this.builderCustomizers) {
-				customizer.customize(builder);
-			}
-		}
 	}
 
 }

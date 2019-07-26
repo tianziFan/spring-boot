@@ -1,8 +1,11 @@
-FROM openjdk:8u141-jdk
+FROM ubuntu:bionic-20181018
 
-RUN apt-get update && \
-    apt-get install -y git && \
-    apt-get install -y libxml2-utils && \
-    apt-get install -y jq
+ADD setup.sh /setup.sh
+ADD get-jdk-url.sh /get-jdk-url.sh
+RUN ./setup.sh java8
 
-ADD https://raw.githubusercontent.com/spring-io/concourse-java-scripts/v0.0.1/concourse-java.sh /opt/
+ENV JAVA_HOME /opt/openjdk
+ENV PATH $JAVA_HOME/bin:$PATH
+ADD docker-lib.sh /docker-lib.sh
+
+ENTRYPOINT [ "switch", "shell=/bin/bash", "--", "codep", "/bin/docker daemon" ]

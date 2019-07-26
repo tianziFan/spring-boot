@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -24,12 +24,12 @@ import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.beans.factory.support.BeanDefinitionRegistry;
 import org.springframework.beans.factory.support.RootBeanDefinition;
 import org.springframework.boot.actuate.autoconfigure.web.ManagementContextFactory;
-import org.springframework.boot.autoconfigure.web.reactive.ReactiveWebServerAutoConfiguration;
-import org.springframework.boot.web.reactive.context.GenericReactiveWebApplicationContext;
-import org.springframework.boot.web.reactive.context.ReactiveWebServerApplicationContext;
+import org.springframework.boot.autoconfigure.web.reactive.ReactiveWebServerFactoryAutoConfiguration;
+import org.springframework.boot.web.context.ConfigurableWebServerApplicationContext;
+import org.springframework.boot.web.reactive.context.AnnotationConfigReactiveWebServerApplicationContext;
 import org.springframework.boot.web.reactive.server.ReactiveWebServerFactory;
 import org.springframework.context.ApplicationContext;
-import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.util.ObjectUtils;
 
 /**
  * A {@link ManagementContextFactory} for reactive web applications.
@@ -39,25 +39,25 @@ import org.springframework.context.ConfigurableApplicationContext;
 class ReactiveManagementContextFactory implements ManagementContextFactory {
 
 	@Override
-	public ConfigurableApplicationContext createManagementContext(
-			ApplicationContext parent, Class<?>... configClasses) {
-		ReactiveWebServerApplicationContext child = new ReactiveWebServerApplicationContext();
+	public ConfigurableWebServerApplicationContext createManagementContext(ApplicationContext parent,
+			Class<?>... configClasses) {
+		AnnotationConfigReactiveWebServerApplicationContext child = new AnnotationConfigReactiveWebServerApplicationContext();
 		child.setParent(parent);
-		child.register(configClasses);
-		child.register(ReactiveWebServerAutoConfiguration.class);
+		Class<?>[] combinedClasses = ObjectUtils.addObjectToArray(configClasses,
+				ReactiveWebServerFactoryAutoConfiguration.class);
+		child.register(combinedClasses);
 		registerReactiveWebServerFactory(parent, child);
 		return child;
 	}
 
 	private void registerReactiveWebServerFactory(ApplicationContext parent,
-			GenericReactiveWebApplicationContext childContext) {
+			AnnotationConfigReactiveWebServerApplicationContext childContext) {
 		try {
 			ConfigurableListableBeanFactory beanFactory = childContext.getBeanFactory();
 			if (beanFactory instanceof BeanDefinitionRegistry) {
 				BeanDefinitionRegistry registry = (BeanDefinitionRegistry) beanFactory;
 				registry.registerBeanDefinition("ReactiveWebServerFactory",
-						new RootBeanDefinition(
-								determineReactiveWebServerFactoryClass(parent)));
+						new RootBeanDefinition(determineReactiveWebServerFactoryClass(parent)));
 			}
 		}
 		catch (NoSuchBeanDefinitionException ex) {
@@ -69,9 +69,8 @@ class ReactiveManagementContextFactory implements ManagementContextFactory {
 			throws NoSuchBeanDefinitionException {
 		Class<?> factoryClass = parent.getBean(ReactiveWebServerFactory.class).getClass();
 		if (cannotBeInstantiated(factoryClass)) {
-			throw new FatalBeanException("ReactiveWebServerFactory implementation "
-					+ factoryClass.getName() + " cannot be instantiated. "
-					+ "To allow a separate management port to be used, a top-level class "
+			throw new FatalBeanException("ReactiveWebServerFactory implementation " + factoryClass.getName()
+					+ " cannot be instantiated. To allow a separate management port to be used, a top-level class "
 					+ "or static inner class should be used instead");
 		}
 		return factoryClass;
@@ -79,8 +78,7 @@ class ReactiveManagementContextFactory implements ManagementContextFactory {
 
 	private boolean cannotBeInstantiated(Class<?> factoryClass) {
 		return factoryClass.isLocalClass()
-				|| (factoryClass.isMemberClass()
-						&& !Modifier.isStatic(factoryClass.getModifiers()))
+				|| (factoryClass.isMemberClass() && !Modifier.isStatic(factoryClass.getModifiers()))
 				|| factoryClass.isAnonymousClass();
 	}
 

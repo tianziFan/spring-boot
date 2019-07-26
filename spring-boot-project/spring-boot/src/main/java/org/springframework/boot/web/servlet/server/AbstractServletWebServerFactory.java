@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,11 +21,17 @@ import java.net.URL;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
+import java.util.Set;
+
+import javax.servlet.ServletContext;
+import javax.servlet.ServletException;
+import javax.servlet.SessionCookieConfig;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -48,12 +54,8 @@ import org.springframework.util.ClassUtils;
  * @author Brian Clozel
  * @since 2.0.0
  */
-public abstract class AbstractServletWebServerFactory
-		extends AbstractConfigurableWebServerFactory
+public abstract class AbstractServletWebServerFactory extends AbstractConfigurableWebServerFactory
 		implements ConfigurableServletWebServerFactory {
-
-	private static final int DEFAULT_SESSION_TIMEOUT = (int) TimeUnit.MINUTES
-			.toSeconds(30);
 
 	protected final Log logger = LogFactory.getLog(getClass());
 
@@ -61,9 +63,7 @@ public abstract class AbstractServletWebServerFactory
 
 	private String displayName;
 
-	private int sessionTimeout = DEFAULT_SESSION_TIMEOUT;
-
-	private boolean persistSession;
+	private Session session = new Session();
 
 	private boolean registerDefaultServlet = true;
 
@@ -75,7 +75,7 @@ public abstract class AbstractServletWebServerFactory
 
 	private Map<Locale, Charset> localeCharsetMappings = new HashMap<>();
 
-	private final SessionStoreDirectory sessionStoreDir = new SessionStoreDirectory();
+	private Map<String, String> initParameters = Collections.emptyMap();
 
 	private final DocumentRoot documentRoot = new DocumentRoot(this.logger);
 
@@ -127,12 +127,10 @@ public abstract class AbstractServletWebServerFactory
 		Assert.notNull(contextPath, "ContextPath must not be null");
 		if (!contextPath.isEmpty()) {
 			if ("/".equals(contextPath)) {
-				throw new IllegalArgumentException(
-						"Root ContextPath must be specified using an empty string");
+				throw new IllegalArgumentException("Root ContextPath must be specified using an empty string");
 			}
 			if (!contextPath.startsWith("/") || contextPath.endsWith("/")) {
-				throw new IllegalArgumentException(
-						"ContextPath must start with '/' and not end with '/'");
+				throw new IllegalArgumentException("ContextPath must start with '/' and not end with '/'");
 			}
 		}
 	}
@@ -144,43 +142,6 @@ public abstract class AbstractServletWebServerFactory
 	@Override
 	public void setDisplayName(String displayName) {
 		this.displayName = displayName;
-	}
-
-	/**
-	 * Return the session timeout in seconds.
-	 * @return the timeout in seconds
-	 */
-	public int getSessionTimeout() {
-		return this.sessionTimeout;
-	}
-
-	@Override
-	public void setSessionTimeout(int sessionTimeout) {
-		this.sessionTimeout = sessionTimeout;
-	}
-
-	@Override
-	public void setSessionTimeout(int sessionTimeout, TimeUnit timeUnit) {
-		Assert.notNull(timeUnit, "TimeUnit must not be null");
-		this.sessionTimeout = (int) timeUnit.toSeconds(sessionTimeout);
-	}
-
-	public boolean isPersistSession() {
-		return this.persistSession;
-	}
-
-	@Override
-	public void setPersistSession(boolean persistSession) {
-		this.persistSession = persistSession;
-	}
-
-	public File getSessionStoreDir() {
-		return this.sessionStoreDir.getDirectory();
-	}
-
-	@Override
-	public void setSessionStoreDir(File sessionStoreDir) {
-		this.sessionStoreDir.setDirectory(sessionStoreDir);
 	}
 
 	/**
@@ -244,6 +205,15 @@ public abstract class AbstractServletWebServerFactory
 		this.jsp = jsp;
 	}
 
+	public Session getSession() {
+		return this.session;
+	}
+
+	@Override
+	public void setSession(Session session) {
+		this.session = session;
+	}
+
 	/**
 	 * Return the Locale to Charset mappings.
 	 * @return the charset mappings
@@ -258,6 +228,15 @@ public abstract class AbstractServletWebServerFactory
 		this.localeCharsetMappings = localeCharsetMappings;
 	}
 
+	@Override
+	public void setInitParameters(Map<String, String> initParameters) {
+		this.initParameters = initParameters;
+	}
+
+	public Map<String, String> getInitParameters() {
+		return this.initParameters;
+	}
+
 	/**
 	 * Utility method that can be used by subclasses wishing to combine the specified
 	 * {@link ServletContextInitializer} parameters with those defined in this instance.
@@ -265,13 +244,13 @@ public abstract class AbstractServletWebServerFactory
 	 * @return a complete set of merged initializers (with the specified parameters
 	 * appearing first)
 	 */
-	protected final ServletContextInitializer[] mergeInitializers(
-			ServletContextInitializer... initializers) {
+	protected final ServletContextInitializer[] mergeInitializers(ServletContextInitializer... initializers) {
 		List<ServletContextInitializer> mergedInitializers = new ArrayList<>();
+		mergedInitializers.add((servletContext) -> this.initParameters.forEach(servletContext::setInitParameter));
+		mergedInitializers.add(new SessionConfiguringInitializer(this.session));
 		mergedInitializers.addAll(Arrays.asList(initializers));
 		mergedInitializers.addAll(this.initializers);
-		return mergedInitializers
-				.toArray(new ServletContextInitializer[mergedInitializers.size()]);
+		return mergedInitializers.toArray(new ServletContextInitializer[0]);
 	}
 
 	/**
@@ -279,8 +258,8 @@ public abstract class AbstractServletWebServerFactory
 	 * @return {@code true} if the servlet should be registered, otherwise {@code false}
 	 */
 	protected boolean shouldRegisterJspServlet() {
-		return this.jsp != null && this.jsp.getRegistered() && ClassUtils
-				.isPresent(this.jsp.getClassName(), getClass().getClassLoader());
+		return this.jsp != null && this.jsp.getRegistered()
+				&& ClassUtils.isPresent(this.jsp.getClassName(), getClass().getClassLoader());
 	}
 
 	/**
@@ -297,11 +276,69 @@ public abstract class AbstractServletWebServerFactory
 	}
 
 	protected final File getValidSessionStoreDir() {
-		return this.sessionStoreDir.getValidDirectory(true);
+		return getValidSessionStoreDir(true);
 	}
 
 	protected final File getValidSessionStoreDir(boolean mkdirs) {
-		return this.sessionStoreDir.getValidDirectory(mkdirs);
+		return this.session.getSessionStoreDirectory().getValidDirectory(mkdirs);
+	}
+
+	/**
+	 * {@link ServletContextInitializer} to apply appropriate parts of the {@link Session}
+	 * configuration.
+	 */
+	private static class SessionConfiguringInitializer implements ServletContextInitializer {
+
+		private final Session session;
+
+		SessionConfiguringInitializer(Session session) {
+			this.session = session;
+		}
+
+		@Override
+		public void onStartup(ServletContext servletContext) throws ServletException {
+			if (this.session.getTrackingModes() != null) {
+				servletContext.setSessionTrackingModes(unwrap(this.session.getTrackingModes()));
+			}
+			configureSessionCookie(servletContext.getSessionCookieConfig());
+		}
+
+		private void configureSessionCookie(SessionCookieConfig config) {
+			Session.Cookie cookie = this.session.getCookie();
+			if (cookie.getName() != null) {
+				config.setName(cookie.getName());
+			}
+			if (cookie.getDomain() != null) {
+				config.setDomain(cookie.getDomain());
+			}
+			if (cookie.getPath() != null) {
+				config.setPath(cookie.getPath());
+			}
+			if (cookie.getComment() != null) {
+				config.setComment(cookie.getComment());
+			}
+			if (cookie.getHttpOnly() != null) {
+				config.setHttpOnly(cookie.getHttpOnly());
+			}
+			if (cookie.getSecure() != null) {
+				config.setSecure(cookie.getSecure());
+			}
+			if (cookie.getMaxAge() != null) {
+				config.setMaxAge((int) cookie.getMaxAge().getSeconds());
+			}
+		}
+
+		private Set<javax.servlet.SessionTrackingMode> unwrap(Set<Session.SessionTrackingMode> modes) {
+			if (modes == null) {
+				return null;
+			}
+			Set<javax.servlet.SessionTrackingMode> result = new LinkedHashSet<>();
+			for (Session.SessionTrackingMode mode : modes) {
+				result.add(javax.servlet.SessionTrackingMode.valueOf(mode.name()));
+			}
+			return result;
+		}
+
 	}
 
 }

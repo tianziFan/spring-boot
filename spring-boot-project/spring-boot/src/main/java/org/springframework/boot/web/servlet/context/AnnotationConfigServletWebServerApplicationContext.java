@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,9 +16,15 @@
 
 package org.springframework.boot.web.servlet.context;
 
+import java.util.Arrays;
+import java.util.LinkedHashSet;
+import java.util.Set;
+
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.beans.factory.support.BeanNameGenerator;
+import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.context.annotation.AnnotatedBeanDefinitionReader;
+import org.springframework.context.annotation.AnnotationConfigRegistry;
 import org.springframework.context.annotation.AnnotationConfigUtils;
 import org.springframework.context.annotation.AnnotationScopeMetadataResolver;
 import org.springframework.context.annotation.ClassPathBeanDefinitionScanner;
@@ -26,7 +32,7 @@ import org.springframework.context.annotation.ScopeMetadataResolver;
 import org.springframework.core.env.ConfigurableEnvironment;
 import org.springframework.stereotype.Component;
 import org.springframework.util.Assert;
-import org.springframework.web.context.support.AnnotationConfigWebApplicationContext;
+import org.springframework.util.ClassUtils;
 
 /**
  * {@link ServletWebServerApplicationContext} that accepts annotated classes as input - in
@@ -41,19 +47,20 @@ import org.springframework.web.context.support.AnnotationConfigWebApplicationCon
  * to deliberately override certain bean definitions via an extra Configuration class.
  *
  * @author Phillip Webb
+ * @since 1.0.0
  * @see #register(Class...)
  * @see #scan(String...)
  * @see ServletWebServerApplicationContext
- * @see AnnotationConfigWebApplicationContext
+ * @see AnnotationConfigServletWebApplicationContext
  */
-public class AnnotationConfigServletWebServerApplicationContext
-		extends ServletWebServerApplicationContext {
+public class AnnotationConfigServletWebServerApplicationContext extends ServletWebServerApplicationContext
+		implements AnnotationConfigRegistry {
 
 	private final AnnotatedBeanDefinitionReader reader;
 
 	private final ClassPathBeanDefinitionScanner scanner;
 
-	private Class<?>[] annotatedClasses;
+	private final Set<Class<?>> annotatedClasses = new LinkedHashSet<>();
 
 	private String[] basePackages;
 
@@ -68,14 +75,25 @@ public class AnnotationConfigServletWebServerApplicationContext
 	}
 
 	/**
+	 * Create a new {@link AnnotationConfigServletWebServerApplicationContext} with the
+	 * given {@code DefaultListableBeanFactory}. The context needs to be populated through
+	 * {@link #register} calls and then manually {@linkplain #refresh refreshed}.
+	 * @param beanFactory the DefaultListableBeanFactory instance to use for this context
+	 */
+	public AnnotationConfigServletWebServerApplicationContext(DefaultListableBeanFactory beanFactory) {
+		super(beanFactory);
+		this.reader = new AnnotatedBeanDefinitionReader(this);
+		this.scanner = new ClassPathBeanDefinitionScanner(this);
+	}
+
+	/**
 	 * Create a new {@link AnnotationConfigServletWebServerApplicationContext}, deriving
 	 * bean definitions from the given annotated classes and automatically refreshing the
 	 * context.
 	 * @param annotatedClasses one or more annotated classes, e.g. {@code @Configuration}
 	 * classes
 	 */
-	public AnnotationConfigServletWebServerApplicationContext(
-			Class<?>... annotatedClasses) {
+	public AnnotationConfigServletWebServerApplicationContext(Class<?>... annotatedClasses) {
 		this();
 		register(annotatedClasses);
 		refresh();
@@ -108,8 +126,8 @@ public class AnnotationConfigServletWebServerApplicationContext
 
 	/**
 	 * Provide a custom {@link BeanNameGenerator} for use with
-	 * {@link AnnotatedBeanDefinitionReader} and/or {@link ClassPathBeanDefinitionScanner}
-	 * , if any.
+	 * {@link AnnotatedBeanDefinitionReader} and/or
+	 * {@link ClassPathBeanDefinitionScanner}, if any.
 	 * <p>
 	 * Default is
 	 * {@link org.springframework.context.annotation.AnnotationBeanNameGenerator}.
@@ -123,8 +141,7 @@ public class AnnotationConfigServletWebServerApplicationContext
 	public void setBeanNameGenerator(BeanNameGenerator beanNameGenerator) {
 		this.reader.setBeanNameGenerator(beanNameGenerator);
 		this.scanner.setBeanNameGenerator(beanNameGenerator);
-		this.getBeanFactory().registerSingleton(
-				AnnotationConfigUtils.CONFIGURATION_BEAN_NAME_GENERATOR,
+		this.getBeanFactory().registerSingleton(AnnotationConfigUtils.CONFIGURATION_BEAN_NAME_GENERATOR,
 				beanNameGenerator);
 	}
 
@@ -154,10 +171,10 @@ public class AnnotationConfigServletWebServerApplicationContext
 	 * @see #scan(String...)
 	 * @see #refresh()
 	 */
+	@Override
 	public final void register(Class<?>... annotatedClasses) {
-		this.annotatedClasses = annotatedClasses;
-		Assert.notEmpty(annotatedClasses,
-				"At least one annotated class must be specified");
+		Assert.notEmpty(annotatedClasses, "At least one annotated class must be specified");
+		this.annotatedClasses.addAll(Arrays.asList(annotatedClasses));
 	}
 
 	/**
@@ -167,9 +184,10 @@ public class AnnotationConfigServletWebServerApplicationContext
 	 * @see #register(Class...)
 	 * @see #refresh()
 	 */
+	@Override
 	public final void scan(String... basePackages) {
-		this.basePackages = basePackages;
 		Assert.notEmpty(basePackages, "At least one base package must be specified");
+		this.basePackages = basePackages;
 	}
 
 	@Override
@@ -184,8 +202,8 @@ public class AnnotationConfigServletWebServerApplicationContext
 		if (this.basePackages != null && this.basePackages.length > 0) {
 			this.scanner.scan(this.basePackages);
 		}
-		if (this.annotatedClasses != null && this.annotatedClasses.length > 0) {
-			this.reader.register(this.annotatedClasses);
+		if (!this.annotatedClasses.isEmpty()) {
+			this.reader.register(ClassUtils.toClassArray(this.annotatedClasses));
 		}
 	}
 

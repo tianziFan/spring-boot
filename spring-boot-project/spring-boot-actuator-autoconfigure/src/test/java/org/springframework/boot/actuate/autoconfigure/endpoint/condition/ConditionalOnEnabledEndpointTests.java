@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,13 +16,12 @@
 
 package org.springframework.boot.actuate.autoconfigure.endpoint.condition;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
-import org.springframework.boot.actuate.endpoint.DefaultEnablement;
-import org.springframework.boot.actuate.endpoint.EndpointExposure;
+import org.springframework.boot.actuate.endpoint.EndpointFilter;
+import org.springframework.boot.actuate.endpoint.ExposableEndpoint;
 import org.springframework.boot.actuate.endpoint.annotation.Endpoint;
-import org.springframework.boot.actuate.endpoint.jmx.annotation.JmxEndpointExtension;
-import org.springframework.boot.actuate.endpoint.web.annotation.WebEndpointExtension;
+import org.springframework.boot.actuate.endpoint.annotation.EndpointExtension;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -30,334 +29,247 @@ import org.springframework.context.annotation.Configuration;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Tests for {@link ConditionalOnEnabledEndpoint}.
+ * Tests for {@link ConditionalOnEnabledEndpoint @ConditionalOnEnabledEndpoint}.
  *
  * @author Stephane Nicoll
  * @author Andy Wilkinson
  */
-public class ConditionalOnEnabledEndpointTests {
+@Deprecated
+@SuppressWarnings("deprecation")
+class ConditionalOnEnabledEndpointTests {
 
 	private final ApplicationContextRunner contextRunner = new ApplicationContextRunner();
 
 	@Test
-	public void enabledByDefault() {
-		this.contextRunner.withUserConfiguration(FooConfig.class)
+	void outcomeWhenEndpointEnabledPropertyIsTrueShouldMatch() {
+		this.contextRunner.withPropertyValues("management.endpoint.foo.enabled=true")
+				.withUserConfiguration(FooEndpointEnabledByDefaultFalseConfiguration.class)
 				.run((context) -> assertThat(context).hasBean("foo"));
 	}
 
 	@Test
-	public void disabledViaSpecificProperty() {
-		this.contextRunner.withUserConfiguration(FooConfig.class)
-				.withPropertyValues("endpoints.foo.enabled=false")
+	void outcomeWhenEndpointEnabledPropertyIsFalseShouldNotMatch() {
+		this.contextRunner.withPropertyValues("management.endpoint.foo.enabled=false")
+				.withUserConfiguration(FooEndpointEnabledByDefaultTrueConfiguration.class)
 				.run((context) -> assertThat(context).doesNotHaveBean("foo"));
 	}
 
 	@Test
-	public void disabledViaGeneralProperty() {
-		this.contextRunner.withUserConfiguration(FooConfig.class)
-				.withPropertyValues("endpoints.default.enabled=false")
+	void outcomeWhenNoEndpointPropertyAndUserDefinedDefaultIsTrueShouldMatch() {
+		this.contextRunner.withPropertyValues("management.endpoints.enabled-by-default=true")
+				.withUserConfiguration(FooEndpointEnabledByDefaultFalseConfiguration.class)
+				.run((context) -> assertThat(context).hasBean("foo"));
+	}
+
+	@Test
+	void outcomeWhenNoEndpointPropertyAndUserDefinedDefaultIsFalseShouldNotMatch() {
+		this.contextRunner.withPropertyValues("management.endpoints.enabled-by-default=false")
+				.withUserConfiguration(FooEndpointEnabledByDefaultTrueConfiguration.class)
 				.run((context) -> assertThat(context).doesNotHaveBean("foo"));
 	}
 
 	@Test
-	public void enabledOverrideViaSpecificProperty() {
-		this.contextRunner.withUserConfiguration(FooConfig.class)
-				.withPropertyValues("endpoints.default.enabled=false",
-						"endpoints.foo.enabled=true")
+	void outcomeWhenNoPropertiesAndAnnotationIsEnabledByDefaultShouldMatch() {
+		this.contextRunner.withUserConfiguration(FooEndpointEnabledByDefaultTrueConfiguration.class)
 				.run((context) -> assertThat(context).hasBean("foo"));
 	}
 
 	@Test
-	public void enabledOverrideViaSpecificWebProperty() {
-		this.contextRunner.withUserConfiguration(FooConfig.class)
-				.withPropertyValues("endpoints.foo.enabled=false",
-						"endpoints.foo.web.enabled=true")
-				.run((context) -> assertThat(context).hasBean("foo"));
-	}
-
-	@Test
-	public void enabledOverrideViaSpecificJmxProperty() {
-		this.contextRunner.withUserConfiguration(FooConfig.class)
-				.withPropertyValues("endpoints.foo.enabled=false",
-						"endpoints.foo.jmx.enabled=true")
-				.run((context) -> assertThat(context).hasBean("foo"));
-	}
-
-	@Test
-	public void enabledOverrideViaSpecificAnyProperty() {
-		this.contextRunner.withUserConfiguration(FooConfig.class)
-				.withPropertyValues("endpoints.foo.enabled=false",
-						"endpoints.foo.web.enabled=false",
-						"endpoints.foo.jmx.enabled=true")
-				.run((context) -> assertThat(context).hasBean("foo"));
-	}
-
-	@Test
-	public void enabledOverrideViaGeneralWebProperty() {
-		this.contextRunner.withUserConfiguration(FooConfig.class)
-				.withPropertyValues("endpoints.default.enabled=false",
-						"endpoints.default.web.enabled=true")
-				.run((context) -> assertThat(context).hasBean("foo"));
-	}
-
-	@Test
-	public void enabledOverrideViaGeneralJmxProperty() {
-		this.contextRunner.withUserConfiguration(FooConfig.class)
-				.withPropertyValues("endpoints.default.enabled=false",
-						"endpoints.default.jmx.enabled=true")
-				.run((context) -> assertThat(context).hasBean("foo"));
-	}
-
-	@Test
-	public void enabledOverrideViaGeneralAnyProperty() {
-		this.contextRunner.withUserConfiguration(FooConfig.class)
-				.withPropertyValues("endpoints.default.enabled=false",
-						"endpoints.default.web.enabled=false",
-						"endpoints.default.jmx.enabled=true")
-				.run((context) -> assertThat(context).hasBean("foo"));
-	}
-
-	@Test
-	public void disabledEvenWithEnabledGeneralProperties() {
-		this.contextRunner.withUserConfiguration(FooConfig.class).withPropertyValues(
-				"endpoints.default.enabled=true", "endpoints.default.web.enabled=true",
-				"endpoints.default.jmx.enabled=true", "endpoints.foo.enabled=false")
+	void outcomeWhenNoPropertiesAndAnnotationIsNotEnabledByDefaultShouldNotMatch() {
+		this.contextRunner.withUserConfiguration(FooEndpointEnabledByDefaultFalseConfiguration.class)
 				.run((context) -> assertThat(context).doesNotHaveBean("foo"));
 	}
 
 	@Test
-	public void disabledByDefaultWithAnnotationFlag() {
-		this.contextRunner.withUserConfiguration(BarConfig.class)
-				.run((context) -> assertThat(context).doesNotHaveBean("bar"));
+	void outcomeWhenNoPropertiesAndExtensionAnnotationIsEnabledByDefaultShouldMatch() {
+		this.contextRunner.withUserConfiguration(FooEndpointAndExtensionEnabledByDefaultTrueConfiguration.class)
+				.run((context) -> assertThat(context).hasBean("foo").hasBean("fooExt"));
 	}
 
 	@Test
-	public void disabledByDefaultWithAnnotationFlagEvenWithGeneralProperty() {
-		this.contextRunner.withUserConfiguration(BarConfig.class)
-				.withPropertyValues("endpoints.default.enabled=true")
-				.run((context) -> assertThat(context).doesNotHaveBean("bar"));
+	void outcomeWhenNoPropertiesAndExtensionAnnotationIsNotEnabledByDefaultShouldNotMatch() {
+		this.contextRunner.withUserConfiguration(FooEndpointAndExtensionEnabledByDefaultFalseConfiguration.class)
+				.run((context) -> assertThat(context).doesNotHaveBean("foo").doesNotHaveBean("fooExt"));
 	}
 
 	@Test
-	public void disabledByDefaultWithAnnotationFlagEvenWithGeneralWebProperty() {
-		this.contextRunner.withUserConfiguration(BarConfig.class)
-				.withPropertyValues("endpoints.default.web.enabled=true")
-				.run((context) -> assertThat(context).doesNotHaveBean("bar"));
+	void outcomeWithReferenceWhenNoPropertiesShouldMatch() {
+		this.contextRunner
+				.withUserConfiguration(FooEndpointEnabledByDefaultTrue.class,
+						ComponentEnabledIfEndpointIsEnabledConfiguration.class)
+				.run((context) -> assertThat(context).hasBean("fooComponent"));
 	}
 
 	@Test
-	public void disabledByDefaultWithAnnotationFlagEvenWithGeneralJmxProperty() {
-		this.contextRunner.withUserConfiguration(BarConfig.class)
-				.withPropertyValues("endpoints.default.jmx.enabled=true")
-				.run((context) -> assertThat(context).doesNotHaveBean("bar"));
+	void outcomeWithReferenceWhenEndpointEnabledPropertyIsTrueShouldMatch() {
+		this.contextRunner.withPropertyValues("management.endpoint.foo.enabled=true")
+				.withUserConfiguration(FooEndpointEnabledByDefaultTrue.class,
+						ComponentEnabledIfEndpointIsEnabledConfiguration.class)
+				.run((context) -> assertThat(context).hasBean("fooComponent"));
 	}
 
 	@Test
-	public void enabledOverrideWithAndAnnotationFlagAndSpecificProperty() {
-		this.contextRunner.withUserConfiguration(BarConfig.class)
-				.withPropertyValues("endpoints.bar.enabled=true")
-				.run((context) -> assertThat(context).hasBean("bar"));
+	void outcomeWithReferenceWhenEndpointEnabledPropertyIsFalseShouldNotMatch() {
+		this.contextRunner.withPropertyValues("management.endpoint.foo.enabled=false")
+				.withUserConfiguration(FooEndpointEnabledByDefaultTrue.class,
+						ComponentEnabledIfEndpointIsEnabledConfiguration.class)
+				.run((context) -> assertThat(context).doesNotHaveBean("fooComponent"));
 	}
 
 	@Test
-	public void enabledOverrideWithAndAnnotationFlagAndSpecificWebProperty() {
-		this.contextRunner.withUserConfiguration(BarConfig.class)
-				.withPropertyValues("endpoints.bar.web.enabled=true")
-				.run((context) -> assertThat(context).hasBean("bar"));
+	void outcomeWithNoReferenceShouldFail() {
+		this.contextRunner.withUserConfiguration(ComponentWithNoEndpointReferenceConfiguration.class).run((context) -> {
+			assertThat(context).hasFailed();
+			assertThat(context.getStartupFailure().getCause().getMessage())
+					.contains("No endpoint is specified and the return type of the @Bean method "
+							+ "is neither an @Endpoint, nor an @EndpointExtension");
+		});
 	}
 
 	@Test
-	public void enabledOverrideWithAndAnnotationFlagAndSpecificJmxProperty() {
-		this.contextRunner.withUserConfiguration(BarConfig.class)
-				.withPropertyValues("endpoints.bar.jmx.enabled=true")
-				.run((context) -> assertThat(context).hasBean("bar"));
+	void outcomeWhenEndpointEnabledPropertyIsTrueAndMixedCaseShouldMatch() {
+		this.contextRunner.withPropertyValues("management.endpoint.foo-bar.enabled=true")
+				.withUserConfiguration(FooBarEndpointEnabledByDefaultFalseConfiguration.class)
+				.run((context) -> assertThat(context).hasBean("fooBar"));
 	}
 
 	@Test
-	public void enabledOverrideWithAndAnnotationFlagAndAnyProperty() {
-		this.contextRunner.withUserConfiguration(BarConfig.class)
-				.withPropertyValues("endpoints.bar.web.enabled=false",
-						"endpoints.bar.jmx.enabled=true")
-				.run((context) -> assertThat(context).hasBean("bar"));
-	}
-
-	@Test
-	public void enabledOnlyWebByDefault() {
-		this.contextRunner.withUserConfiguration(OnlyWebConfig.class)
-				.withPropertyValues("endpoints.default.web.enabled=true")
-				.run((context) -> assertThat(context).hasBean("onlyweb"));
-	}
-
-	@Test
-	public void disabledOnlyWebViaEndpointProperty() {
-		this.contextRunner.withUserConfiguration(OnlyWebConfig.class)
-				.withPropertyValues("endpoints.onlyweb.enabled=false")
-				.run((context) -> assertThat(context).doesNotHaveBean("onlyweb"));
-	}
-
-	@Test
-	public void disabledOnlyWebViaSpecificTechProperty() {
-		this.contextRunner.withUserConfiguration(OnlyWebConfig.class)
-				.withPropertyValues("endpoints.onlyweb.web.enabled=false")
-				.run((context) -> assertThat(context).doesNotHaveBean("onlyweb"));
-	}
-
-	@Test
-	public void enableOverridesOnlyWebViaGeneralJmxPropertyHasNoEffect() {
-		this.contextRunner.withUserConfiguration(OnlyWebConfig.class)
-				.withPropertyValues("endpoints.default.enabled=false",
-						"endpoints.default.jmx.enabled=true")
-				.run((context) -> assertThat(context).doesNotHaveBean("onlyweb"));
-	}
-
-	@Test
-	public void enableOverridesOnlyWebViaSpecificJmxPropertyHasNoEffect() {
-		this.contextRunner.withUserConfiguration(OnlyWebConfig.class)
-				.withPropertyValues("endpoints.default.enabled=false",
-						"endpoints.onlyweb.jmx.enabled=false")
-				.run((context) -> assertThat(context).doesNotHaveBean("onlyweb"));
-	}
-
-	@Test
-	public void enableOverridesOnlyWebViaSpecificWebProperty() {
-		this.contextRunner.withUserConfiguration(OnlyWebConfig.class)
-				.withPropertyValues("endpoints.default.enabled=false",
-						"endpoints.onlyweb.web.enabled=true")
-				.run((context) -> assertThat(context).hasBean("onlyweb"));
-	}
-
-	@Test
-	public void disabledOnlyWebEvenWithEnabledGeneralProperties() {
-		this.contextRunner.withUserConfiguration(OnlyWebConfig.class).withPropertyValues(
-				"endpoints.default.enabled=true", "endpoints.default.web.enabled=true",
-				"endpoints.onlyweb.enabled=true", "endpoints.onlyweb.web.enabled=false")
+	void outcomeWhenEndpointEnabledPropertyIsFalseOnClassShouldNotMatch() {
+		this.contextRunner.withPropertyValues("management.endpoint.foo.enabled=false")
+				.withUserConfiguration(FooEndpointEnabledByDefaultTrueOnConfigurationConfiguration.class)
 				.run((context) -> assertThat(context).doesNotHaveBean("foo"));
 	}
 
-	@Test
-	public void contextFailIfEndpointTypeIsNotDetected() {
-		this.contextRunner.withUserConfiguration(NonEndpointBeanConfig.class)
-				.run((context) -> assertThat(context).hasFailed());
+	@Endpoint(id = "foo", enableByDefault = true)
+	static class FooEndpointEnabledByDefaultTrue {
+
 	}
 
-	@Test
-	public void webExtensionWithEnabledByDefaultEndpoint() {
-		this.contextRunner.withUserConfiguration(FooWebExtensionConfig.class)
-				.run((context) -> assertThat(context)
-						.hasSingleBean(FooWebEndpointExtension.class));
+	@Endpoint(id = "foo", enableByDefault = false)
+	static class FooEndpointEnabledByDefaultFalse {
+
 	}
 
-	@Test
-	public void webExtensionWithEnabledByDefaultEndpointCanBeDisabled() {
-		this.contextRunner.withUserConfiguration(FooWebExtensionConfig.class)
-				.withPropertyValues("endpoints.foo.enabled=false")
-				.run((context) -> assertThat(context)
-						.doesNotHaveBean(FooWebEndpointExtension.class));
+	@Endpoint(id = "fooBar", enableByDefault = false)
+	static class FooBarEndpointEnabledByDefaultFalse {
+
 	}
 
-	@Test
-	public void jmxExtensionWithEnabledByDefaultEndpoint() {
-		this.contextRunner.withUserConfiguration(FooJmxExtensionConfig.class)
-				.run((context) -> assertThat(context)
-						.hasSingleBean(FooJmxEndpointExtension.class));
+	@EndpointExtension(endpoint = FooEndpointEnabledByDefaultTrue.class, filter = TestFilter.class)
+	static class FooEndpointExtensionEnabledByDefaultTrue {
+
 	}
 
-	@Test
-	public void jmxExtensionWithEnabledByDefaultEndpointCanBeDisabled() {
-		this.contextRunner.withUserConfiguration(FooJmxExtensionConfig.class)
-				.withPropertyValues("endpoints.foo.enabled=false")
-				.run((context) -> assertThat(context)
-						.doesNotHaveBean(FooJmxEndpointExtension.class));
+	@EndpointExtension(endpoint = FooEndpointEnabledByDefaultFalse.class, filter = TestFilter.class)
+	static class FooEndpointExtensionEnabledByDefaultFalse {
+
 	}
 
-	@Configuration
-	static class FooConfig {
+	static class TestFilter implements EndpointFilter<ExposableEndpoint<?>> {
 
-		@Bean
-		@ConditionalOnEnabledEndpoint
-		public FooEndpoint foo() {
-			return new FooEndpoint();
+		@Override
+		public boolean match(ExposableEndpoint<?> endpoint) {
+			return true;
 		}
 
 	}
 
-	@Endpoint(id = "foo")
-	static class FooEndpoint {
-
-	}
-
-	@Configuration
-	static class BarConfig {
+	@Configuration(proxyBeanMethods = false)
+	static class FooEndpointEnabledByDefaultTrueConfiguration {
 
 		@Bean
 		@ConditionalOnEnabledEndpoint
-		public BarEndpoint bar() {
-			return new BarEndpoint();
+		FooEndpointEnabledByDefaultTrue foo() {
+			return new FooEndpointEnabledByDefaultTrue();
 		}
 
 	}
 
-	@Endpoint(id = "bar", exposure = { EndpointExposure.WEB,
-			EndpointExposure.JMX }, defaultEnablement = DefaultEnablement.DISABLED)
-	static class BarEndpoint {
+	@Configuration(proxyBeanMethods = false)
+	@ConditionalOnEnabledEndpoint(endpoint = FooEndpointEnabledByDefaultTrue.class)
+	static class FooEndpointEnabledByDefaultTrueOnConfigurationConfiguration {
 
-	}
-
-	@Configuration
-	static class OnlyWebConfig {
-
-		@Bean(name = "onlyweb")
-		@ConditionalOnEnabledEndpoint
-		public OnlyWebEndpoint onlyWeb() {
-			return new OnlyWebEndpoint();
+		@Bean
+		FooEndpointEnabledByDefaultTrue foo() {
+			return new FooEndpointEnabledByDefaultTrue();
 		}
 
 	}
 
-	@Endpoint(id = "onlyweb", exposure = EndpointExposure.WEB)
-	static class OnlyWebEndpoint {
-
-	}
-
-	@Configuration
-	static class NonEndpointBeanConfig {
+	@Configuration(proxyBeanMethods = false)
+	static class FooEndpointEnabledByDefaultFalseConfiguration {
 
 		@Bean
 		@ConditionalOnEnabledEndpoint
-		public String foo() {
-			return "endpoint type cannot be detected";
+		FooEndpointEnabledByDefaultFalse foo() {
+			return new FooEndpointEnabledByDefaultFalse();
 		}
 
 	}
 
-	@JmxEndpointExtension(endpoint = FooEndpoint.class)
-	static class FooJmxEndpointExtension {
-
-	}
-
-	@Configuration
-	static class FooJmxExtensionConfig {
+	@Configuration(proxyBeanMethods = false)
+	static class FooBarEndpointEnabledByDefaultFalseConfiguration {
 
 		@Bean
 		@ConditionalOnEnabledEndpoint
-		FooJmxEndpointExtension fooJmxEndpointExtension() {
-			return new FooJmxEndpointExtension();
+		FooBarEndpointEnabledByDefaultFalse fooBar() {
+			return new FooBarEndpointEnabledByDefaultFalse();
 		}
 
 	}
 
-	@WebEndpointExtension(endpoint = FooEndpoint.class)
-	static class FooWebEndpointExtension {
-
-	}
-
-	@Configuration
-	static class FooWebExtensionConfig {
+	@Configuration(proxyBeanMethods = false)
+	static class FooEndpointAndExtensionEnabledByDefaultTrueConfiguration {
 
 		@Bean
 		@ConditionalOnEnabledEndpoint
-		FooWebEndpointExtension fooJmxEndpointExtension() {
-			return new FooWebEndpointExtension();
+		FooEndpointEnabledByDefaultTrue foo() {
+			return new FooEndpointEnabledByDefaultTrue();
+		}
+
+		@Bean
+		@ConditionalOnEnabledEndpoint
+		FooEndpointExtensionEnabledByDefaultTrue fooExt() {
+			return new FooEndpointExtensionEnabledByDefaultTrue();
+		}
+
+	}
+
+	@Configuration(proxyBeanMethods = false)
+	static class FooEndpointAndExtensionEnabledByDefaultFalseConfiguration {
+
+		@Bean
+		@ConditionalOnEnabledEndpoint
+		FooEndpointEnabledByDefaultFalse foo() {
+			return new FooEndpointEnabledByDefaultFalse();
+		}
+
+		@Bean
+		@ConditionalOnEnabledEndpoint
+		FooEndpointExtensionEnabledByDefaultFalse fooExt() {
+			return new FooEndpointExtensionEnabledByDefaultFalse();
+		}
+
+	}
+
+	@Configuration(proxyBeanMethods = false)
+	static class ComponentEnabledIfEndpointIsEnabledConfiguration {
+
+		@Bean
+		@ConditionalOnEnabledEndpoint(endpoint = FooEndpointEnabledByDefaultTrue.class)
+		String fooComponent() {
+			return "foo";
+		}
+
+	}
+
+	@Configuration(proxyBeanMethods = false)
+	static class ComponentWithNoEndpointReferenceConfiguration {
+
+		@Bean
+		@ConditionalOnEnabledEndpoint
+		String fooComponent() {
+			return "foo";
 		}
 
 	}

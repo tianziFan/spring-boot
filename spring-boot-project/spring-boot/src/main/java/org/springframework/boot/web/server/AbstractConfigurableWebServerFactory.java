@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -37,8 +37,7 @@ import org.springframework.util.Assert;
  * @author Brian Clozel
  * @since 2.0.0
  */
-public class AbstractConfigurableWebServerFactory
-		implements ConfigurableWebServerFactory {
+public abstract class AbstractConfigurableWebServerFactory implements ConfigurableWebServerFactory {
 
 	private int port = 8080;
 
@@ -49,6 +48,8 @@ public class AbstractConfigurableWebServerFactory
 	private Ssl ssl;
 
 	private SslStoreProvider sslStoreProvider;
+
+	private Http2 http2;
 
 	private Compression compression;
 
@@ -70,7 +71,7 @@ public class AbstractConfigurableWebServerFactory
 	}
 
 	/**
-	 * The port that the web server server listens on.
+	 * The port that the web server listens on.
 	 * @return the port
 	 */
 	public int getPort() {
@@ -134,6 +135,15 @@ public class AbstractConfigurableWebServerFactory
 		this.sslStoreProvider = sslStoreProvider;
 	}
 
+	public Http2 getHttp2() {
+		return this.http2;
+	}
+
+	@Override
+	public void setHttp2(Http2 http2) {
+		this.http2 = http2;
+	}
+
 	public Compression getCompression() {
 		return this.compression;
 	}
@@ -155,7 +165,7 @@ public class AbstractConfigurableWebServerFactory
 	/**
 	 * Return the absolute temp dir for given web server.
 	 * @param prefix server name
-	 * @return The temp dir for given server.
+	 * @return the temp dir for given server.
 	 */
 	protected final File createTempDir(String prefix) {
 		try {
@@ -167,9 +177,7 @@ public class AbstractConfigurableWebServerFactory
 		}
 		catch (IOException ex) {
 			throw new WebServerException(
-					"Unable to create tempDir. java.io.tmpdir is set to "
-							+ System.getProperty("java.io.tmpdir"),
-					ex);
+					"Unable to create tempDir. java.io.tmpdir is set to " + System.getProperty("java.io.tmpdir"), ex);
 		}
 	}
 

@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -29,8 +29,8 @@ import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.util.StringUtils;
 
 /**
- * {@link Endpoint} to expose details of an application's beans, grouped by application
- * context.
+ * {@link Endpoint @Endpoint} to expose details of an application's beans, grouped by
+ * application context.
  *
  * @author Dave Syer
  * @author Andy Wilkinson
@@ -44,7 +44,6 @@ public class BeansEndpoint {
 	/**
 	 * Creates a new {@code BeansEndpoint} that will describe the beans in the given
 	 * {@code context} and all of its ancestors.
-	 *
 	 * @param context the application context
 	 * @see ConfigurableApplicationContext#getParent()
 	 */
@@ -53,53 +52,74 @@ public class BeansEndpoint {
 	}
 
 	@ReadOperation
-	public ApplicationContextDescriptor beans() {
-		return ApplicationContextDescriptor.describing(this.context);
+	public ApplicationBeans beans() {
+		Map<String, ContextBeans> contexts = new HashMap<>();
+		ConfigurableApplicationContext context = this.context;
+		while (context != null) {
+			contexts.put(context.getId(), ContextBeans.describing(context));
+			context = getConfigurableParent(context);
+		}
+		return new ApplicationBeans(contexts);
+	}
+
+	private static ConfigurableApplicationContext getConfigurableParent(ConfigurableApplicationContext context) {
+		ApplicationContext parent = context.getParent();
+		if (parent instanceof ConfigurableApplicationContext) {
+			return (ConfigurableApplicationContext) parent;
+		}
+		return null;
+	}
+
+	/**
+	 * A description of an application's beans, primarily intended for serialization to
+	 * JSON.
+	 */
+	public static final class ApplicationBeans {
+
+		private final Map<String, ContextBeans> contexts;
+
+		private ApplicationBeans(Map<String, ContextBeans> contexts) {
+			this.contexts = contexts;
+		}
+
+		public Map<String, ContextBeans> getContexts() {
+			return this.contexts;
+		}
+
 	}
 
 	/**
 	 * A description of an application context, primarily intended for serialization to
 	 * JSON.
 	 */
-	public static final class ApplicationContextDescriptor {
-
-		private final String id;
+	public static final class ContextBeans {
 
 		private final Map<String, BeanDescriptor> beans;
 
-		private final ApplicationContextDescriptor parent;
+		private final String parentId;
 
-		private ApplicationContextDescriptor(String id, Map<String, BeanDescriptor> beans,
-				ApplicationContextDescriptor parent) {
-			this.id = id;
+		private ContextBeans(Map<String, BeanDescriptor> beans, String parentId) {
 			this.beans = beans;
-			this.parent = parent;
+			this.parentId = parentId;
 		}
 
-		public String getId() {
-			return this.id;
-		}
-
-		public ApplicationContextDescriptor getParent() {
-			return this.parent;
+		public String getParentId() {
+			return this.parentId;
 		}
 
 		public Map<String, BeanDescriptor> getBeans() {
 			return this.beans;
 		}
 
-		private static ApplicationContextDescriptor describing(
-				ConfigurableApplicationContext context) {
+		private static ContextBeans describing(ConfigurableApplicationContext context) {
 			if (context == null) {
 				return null;
 			}
-			return new ApplicationContextDescriptor(context.getId(),
-					describeBeans(context.getBeanFactory()),
-					describing(getConfigurableParent(context)));
+			ConfigurableApplicationContext parent = getConfigurableParent(context);
+			return new ContextBeans(describeBeans(context.getBeanFactory()), (parent != null) ? parent.getId() : null);
 		}
 
-		private static Map<String, BeanDescriptor> describeBeans(
-				ConfigurableListableBeanFactory beanFactory) {
+		private static Map<String, BeanDescriptor> describeBeans(ConfigurableListableBeanFactory beanFactory) {
 			Map<String, BeanDescriptor> beans = new HashMap<>();
 			for (String beanName : beanFactory.getBeanDefinitionNames()) {
 				BeanDefinition definition = beanFactory.getBeanDefinition(beanName);
@@ -112,24 +132,13 @@ public class BeansEndpoint {
 
 		private static BeanDescriptor describeBean(String name, BeanDefinition definition,
 				ConfigurableListableBeanFactory factory) {
-			return new BeanDescriptor(factory.getAliases(name), definition.getScope(),
-					factory.getType(name), definition.getResourceDescription(),
-					factory.getDependenciesForBean(name));
+			return new BeanDescriptor(factory.getAliases(name), definition.getScope(), factory.getType(name),
+					definition.getResourceDescription(), factory.getDependenciesForBean(name));
 		}
 
-		private static boolean isBeanEligible(String beanName, BeanDefinition bd,
-				ConfigurableBeanFactory bf) {
+		private static boolean isBeanEligible(String beanName, BeanDefinition bd, ConfigurableBeanFactory bf) {
 			return (bd.getRole() != BeanDefinition.ROLE_INFRASTRUCTURE
 					&& (!bd.isLazyInit() || bf.containsSingleton(beanName)));
-		}
-
-		private static ConfigurableApplicationContext getConfigurableParent(
-				ConfigurableApplicationContext context) {
-			ApplicationContext parent = context.getParent();
-			if (parent instanceof ConfigurableApplicationContext) {
-				return (ConfigurableApplicationContext) parent;
-			}
-			return null;
 		}
 
 	}
@@ -150,11 +159,9 @@ public class BeansEndpoint {
 
 		private final String[] dependencies;
 
-		private BeanDescriptor(String[] aliases, String scope, Class<?> type,
-				String resource, String[] dependencies) {
+		private BeanDescriptor(String[] aliases, String scope, Class<?> type, String resource, String[] dependencies) {
 			this.aliases = aliases;
-			this.scope = StringUtils.hasText(scope) ? scope
-					: BeanDefinition.SCOPE_SINGLETON;
+			this.scope = (StringUtils.hasText(scope) ? scope : BeanDefinition.SCOPE_SINGLETON);
 			this.type = type;
 			this.resource = resource;
 			this.dependencies = dependencies;

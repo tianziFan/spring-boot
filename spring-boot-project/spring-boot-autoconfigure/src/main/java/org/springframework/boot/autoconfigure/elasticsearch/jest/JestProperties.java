@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,6 +16,7 @@
 
 package org.springframework.boot.autoconfigure.elasticsearch.jest;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -34,11 +35,10 @@ public class JestProperties {
 	/**
 	 * Comma-separated list of the Elasticsearch instances to use.
 	 */
-	private List<String> uris = new ArrayList<>(
-			Collections.singletonList("http://localhost:9200"));
+	private List<String> uris = new ArrayList<>(Collections.singletonList("http://localhost:9200"));
 
 	/**
-	 * Login user.
+	 * Login username.
 	 */
 	private String username;
 
@@ -48,19 +48,19 @@ public class JestProperties {
 	private String password;
 
 	/**
-	 * Enable connection requests from multiple execution threads.
+	 * Whether to enable connection requests from multiple execution threads.
 	 */
 	private boolean multiThreaded = true;
 
 	/**
-	 * Connection timeout in milliseconds.
+	 * Connection timeout.
 	 */
-	private int connectionTimeout = 3000;
+	private Duration connectionTimeout = Duration.ofSeconds(3);
 
 	/**
-	 * Read timeout in milliseconds.
+	 * Read timeout.
 	 */
-	private int readTimeout = 3000;
+	private Duration readTimeout = Duration.ofSeconds(3);
 
 	/**
 	 * Proxy settings.
@@ -99,19 +99,19 @@ public class JestProperties {
 		this.multiThreaded = multiThreaded;
 	}
 
-	public int getConnectionTimeout() {
+	public Duration getConnectionTimeout() {
 		return this.connectionTimeout;
 	}
 
-	public void setConnectionTimeout(int connectionTimeout) {
+	public void setConnectionTimeout(Duration connectionTimeout) {
 		this.connectionTimeout = connectionTimeout;
 	}
 
-	public int getReadTimeout() {
+	public Duration getReadTimeout() {
 		return this.readTimeout;
 	}
 
-	public void setReadTimeout(int readTimeout) {
+	public void setReadTimeout(Duration readTimeout) {
 		this.readTimeout = readTimeout;
 	}
 

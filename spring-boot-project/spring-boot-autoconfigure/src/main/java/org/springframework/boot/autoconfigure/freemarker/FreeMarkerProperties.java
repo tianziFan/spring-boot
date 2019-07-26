@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,7 +23,7 @@ import org.springframework.boot.autoconfigure.template.AbstractTemplateViewResol
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
- * {@link ConfigurationProperties} for configuring FreeMarker.
+ * {@link ConfigurationProperties @ConfigurationProperties} for configuring FreeMarker.
  *
  * @author Dave Syer
  * @author Andy Wilkinson
@@ -36,10 +36,10 @@ public class FreeMarkerProperties extends AbstractTemplateViewResolverProperties
 
 	public static final String DEFAULT_PREFIX = "";
 
-	public static final String DEFAULT_SUFFIX = ".ftl";
+	public static final String DEFAULT_SUFFIX = ".ftlh";
 
 	/**
-	 * Well-known FreeMarker keys which will be passed to FreeMarker's Configuration.
+	 * Well-known FreeMarker keys which are passed to FreeMarker's Configuration.
 	 */
 	private Map<String, String> settings = new HashMap<>();
 
@@ -49,8 +49,8 @@ public class FreeMarkerProperties extends AbstractTemplateViewResolverProperties
 	private String[] templateLoaderPath = new String[] { DEFAULT_TEMPLATE_LOADER_PATH };
 
 	/**
-	 * Prefer file system access for template loading. File system access enables hot
-	 * detection of template changes.
+	 * Whether to prefer file system access for template loading. File system access
+	 * enables hot detection of template changes.
 	 */
 	private boolean preferFileSystemAccess = true;
 

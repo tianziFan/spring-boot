@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,6 +17,7 @@
 package org.springframework.boot.autoconfigure.template;
 
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -25,7 +26,8 @@ import org.springframework.util.MimeType;
 import org.springframework.web.servlet.ViewResolver;
 
 /**
- * Base class for {@link ConfigurationProperties} of a {@link ViewResolver}.
+ * Base class for {@link ConfigurationProperties @ConfigurationProperties} of a
+ * {@link ViewResolver}.
  *
  * @author Andy Wilkinson
  * @author Stephane Nicoll
@@ -36,15 +38,15 @@ public abstract class AbstractViewResolverProperties {
 
 	private static final MimeType DEFAULT_CONTENT_TYPE = MimeType.valueOf("text/html");
 
-	private static final Charset DEFAULT_CHARSET = Charset.forName("UTF-8");
+	private static final Charset DEFAULT_CHARSET = StandardCharsets.UTF_8;
 
 	/**
-	 * Enable MVC view resolution for this technology.
+	 * Whether to enable MVC view resolution for this technology.
 	 */
 	private boolean enabled = true;
 
 	/**
-	 * Enable template caching.
+	 * Whether to enable template caching.
 	 */
 	private boolean cache;
 
@@ -64,7 +66,7 @@ public abstract class AbstractViewResolverProperties {
 	private String[] viewNames;
 
 	/**
-	 * Check that the templates location exists.
+	 * Whether to check that the templates location exists.
 	 */
 	private boolean checkTemplateLocation = true;
 
@@ -119,7 +121,7 @@ public abstract class AbstractViewResolverProperties {
 	}
 
 	public String getCharsetName() {
-		return (this.charset != null ? this.charset.name() : null);
+		return (this.charset != null) ? this.charset.name() : null;
 	}
 
 	public void setCharset(Charset charset) {

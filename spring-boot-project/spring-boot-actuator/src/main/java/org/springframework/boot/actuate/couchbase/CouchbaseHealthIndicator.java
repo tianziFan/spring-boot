@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,38 +16,40 @@
 
 package org.springframework.boot.actuate.couchbase;
 
-import java.util.List;
-
-import com.couchbase.client.java.util.features.Version;
+import com.couchbase.client.core.message.internal.DiagnosticsReport;
+import com.couchbase.client.java.Cluster;
 
 import org.springframework.boot.actuate.health.AbstractHealthIndicator;
 import org.springframework.boot.actuate.health.Health;
 import org.springframework.boot.actuate.health.HealthIndicator;
-import org.springframework.data.couchbase.core.CouchbaseOperations;
 import org.springframework.util.Assert;
-import org.springframework.util.StringUtils;
 
 /**
  * {@link HealthIndicator} for Couchbase.
  *
  * @author Eddú Meléndez
+ * @author Stephane Nicoll
  * @since 2.0.0
  */
 public class CouchbaseHealthIndicator extends AbstractHealthIndicator {
 
-	private CouchbaseOperations couchbaseOperations;
+	private final Cluster cluster;
 
-	public CouchbaseHealthIndicator(CouchbaseOperations couchbaseOperations) {
-		Assert.notNull(couchbaseOperations, "CouchbaseOperations must not be null");
-		this.couchbaseOperations = couchbaseOperations;
+	/**
+	 * Create an indicator with the specified {@link Cluster}.
+	 * @param cluster the Couchbase Cluster
+	 * @since 2.0.6
+	 */
+	public CouchbaseHealthIndicator(Cluster cluster) {
+		super("Couchbase health check failed");
+		Assert.notNull(cluster, "Cluster must not be null");
+		this.cluster = cluster;
 	}
 
 	@Override
 	protected void doHealthCheck(Health.Builder builder) throws Exception {
-		List<Version> versions = this.couchbaseOperations.getCouchbaseClusterInfo()
-				.getAllVersions();
-		builder.up().withDetail("versions",
-				StringUtils.collectionToCommaDelimitedString(versions));
+		DiagnosticsReport diagnostics = this.cluster.diagnostics();
+		new CouchbaseHealth(diagnostics).applyTo(builder);
 	}
 
 }

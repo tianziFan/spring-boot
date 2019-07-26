@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -27,8 +27,7 @@ import java.util.Set;
  * @since 2.0.0
  * @see ErrorPageRegistry
  */
-public interface ConfigurableWebServerFactory
-		extends WebServerFactory, ErrorPageRegistry {
+public interface ConfigurableWebServerFactory extends WebServerFactory, ErrorPageRegistry {
 
 	/**
 	 * Sets the port that the web server should listen on. If not specified port '8080'
@@ -61,6 +60,12 @@ public interface ConfigurableWebServerFactory
 	 * @param sslStoreProvider the SSL store provider
 	 */
 	void setSslStoreProvider(SslStoreProvider sslStoreProvider);
+
+	/**
+	 * Sets the HTTP/2 configuration that will be applied to the server.
+	 * @param http2 the HTTP/2 configuration
+	 */
+	void setHttp2(Http2 http2);
 
 	/**
 	 * Sets the compression configuration that will be applied to the server's default

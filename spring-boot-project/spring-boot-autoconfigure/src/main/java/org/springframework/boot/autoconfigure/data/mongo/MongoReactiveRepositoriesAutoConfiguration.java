@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -22,7 +22,8 @@ import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.data.ConditionalOnRepositoryType;
+import org.springframework.boot.autoconfigure.data.RepositoryType;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.mongodb.repository.ReactiveMongoRepository;
@@ -41,18 +42,19 @@ import org.springframework.data.mongodb.repository.support.ReactiveMongoReposito
  * and there is no other configured {@link ReactiveMongoRepository}.
  * <p>
  * Once in effect, the auto-configuration is the equivalent of enabling Mongo repositories
- * using the {@link EnableReactiveMongoRepositories} annotation.
+ * using the {@link EnableReactiveMongoRepositories @EnableReactiveMongoRepositories}
+ * annotation.
  *
  * @author Mark Paluch
  * @since 2.0.0
  * @see EnableReactiveMongoRepositories
  */
-@Configuration
+@Configuration(proxyBeanMethods = false)
 @ConditionalOnClass({ MongoClient.class, ReactiveMongoRepository.class })
 @ConditionalOnMissingBean({ ReactiveMongoRepositoryFactoryBean.class,
 		ReactiveMongoRepositoryConfigurationExtension.class })
-@ConditionalOnProperty(prefix = "spring.data.mongodb.reactive-repositories", name = "enabled", havingValue = "true", matchIfMissing = true)
-@Import(MongoReactiveRepositoriesAutoConfigureRegistrar.class)
+@ConditionalOnRepositoryType(store = "mongodb", type = RepositoryType.REACTIVE)
+@Import(MongoReactiveRepositoriesRegistrar.class)
 @AutoConfigureAfter(MongoReactiveDataAutoConfiguration.class)
 public class MongoReactiveRepositoriesAutoConfiguration {
 

@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,15 +18,18 @@ package org.springframework.boot.loader.tools;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
 import java.util.jar.JarFile;
 import java.util.jar.Manifest;
 
-import org.junit.rules.TemporaryFolder;
+import org.zeroturnaround.zip.FileSource;
+import org.zeroturnaround.zip.ZipEntrySource;
 import org.zeroturnaround.zip.ZipUtil;
 
 /**
@@ -37,29 +40,31 @@ public class TestJarFile {
 
 	private final byte[] buffer = new byte[4096];
 
-	private final TemporaryFolder temporaryFolder;
+	private final File temporaryFolder;
 
 	private final File jarSource;
 
-	public TestJarFile(TemporaryFolder temporaryFolder) throws IOException {
+	private final List<ZipEntrySource> entries = new ArrayList<>();
+
+	public TestJarFile(File temporaryFolder) throws IOException {
 		this.temporaryFolder = temporaryFolder;
-		this.jarSource = temporaryFolder.newFolder();
+		this.jarSource = new File(temporaryFolder, "jar-source");
 	}
 
 	public void addClass(String filename, Class<?> classToCopy) throws IOException {
 		addClass(filename, classToCopy, null);
 	}
 
-	public void addClass(String filename, Class<?> classToCopy, Long time)
-			throws IOException {
+	public void addClass(String filename, Class<?> classToCopy, Long time) throws IOException {
 		File file = getFilePath(filename);
 		file.getParentFile().mkdirs();
-		InputStream inputStream = getClass().getResourceAsStream(
-				"/" + classToCopy.getName().replace('.', '/') + ".class");
+		InputStream inputStream = getClass()
+				.getResourceAsStream("/" + classToCopy.getName().replace('.', '/') + ".class");
 		copyToFile(inputStream, file);
 		if (time != null) {
 			file.setLastModified(time);
 		}
+		this.entries.add(new FileSource(filename, file));
 	}
 
 	public void addFile(String filename, File fileToCopy) throws IOException {
@@ -68,6 +73,7 @@ public class TestJarFile {
 		try (InputStream inputStream = new FileInputStream(fileToCopy)) {
 			copyToFile(inputStream, file);
 		}
+		this.entries.add(new FileSource(filename, file));
 	}
 
 	public void addManifest(Manifest manifest) throws IOException {
@@ -76,6 +82,7 @@ public class TestJarFile {
 		try (OutputStream outputStream = new FileOutputStream(manifestFile)) {
 			manifest.write(outputStream);
 		}
+		this.entries.add(new FileSource("META-INF/MANIFEST.MF", manifestFile));
 	}
 
 	private File getFilePath(String filename) {
@@ -87,15 +94,14 @@ public class TestJarFile {
 		return file;
 	}
 
-	private void copyToFile(InputStream inputStream, File file)
-			throws FileNotFoundException, IOException {
+	private void copyToFile(InputStream inputStream, File file) throws IOException {
 		try (OutputStream outputStream = new FileOutputStream(file)) {
 			copy(inputStream, outputStream);
 		}
 	}
 
 	private void copy(InputStream in, OutputStream out) throws IOException {
-		int bytesRead = -1;
+		int bytesRead;
 		while ((bytesRead = in.read(this.buffer)) != -1) {
 			out.write(this.buffer, 0, bytesRead);
 		}
@@ -114,9 +120,8 @@ public class TestJarFile {
 	}
 
 	public File getFile(String extension) throws IOException {
-		File file = this.temporaryFolder.newFile();
-		file = new File(file.getParent(), file.getName() + "." + extension);
-		ZipUtil.pack(this.jarSource, file);
+		File file = new File(this.temporaryFolder, UUID.randomUUID() + "." + extension);
+		ZipUtil.pack(this.entries.toArray(new ZipEntrySource[0]), file);
 		return file;
 	}
 

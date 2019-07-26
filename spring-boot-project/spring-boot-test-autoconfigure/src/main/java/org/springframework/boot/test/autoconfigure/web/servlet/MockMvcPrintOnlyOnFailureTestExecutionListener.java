@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,6 +17,7 @@
 package org.springframework.boot.test.autoconfigure.web.servlet;
 
 import org.springframework.boot.test.autoconfigure.web.servlet.SpringBootMockMvcBuilderCustomizer.DeferredLinesWriter;
+import org.springframework.core.Ordered;
 import org.springframework.test.context.TestContext;
 import org.springframework.test.context.TestExecutionListener;
 import org.springframework.test.context.support.AbstractTestExecutionListener;
@@ -26,17 +27,21 @@ import org.springframework.test.context.support.AbstractTestExecutionListener;
  *
  * @author Phillip Webb
  */
-class MockMvcPrintOnlyOnFailureTestExecutionListener
-		extends AbstractTestExecutionListener {
+class MockMvcPrintOnlyOnFailureTestExecutionListener extends AbstractTestExecutionListener {
+
+	@Override
+	public int getOrder() {
+		return Ordered.LOWEST_PRECEDENCE - 100;
+	}
 
 	@Override
 	public void afterTestMethod(TestContext testContext) throws Exception {
-		if (testContext.getTestException() != null) {
-			DeferredLinesWriter writer = DeferredLinesWriter
-					.get(testContext.getApplicationContext());
-			if (writer != null) {
+		DeferredLinesWriter writer = DeferredLinesWriter.get(testContext.getApplicationContext());
+		if (writer != null) {
+			if (testContext.getTestException() != null) {
 				writer.writeDeferredResult();
 			}
+			writer.clear();
 		}
 
 	}

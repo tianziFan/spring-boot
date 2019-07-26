@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -29,6 +29,7 @@ import org.gradle.api.distribution.Distribution;
 import org.gradle.api.distribution.DistributionContainer;
 import org.gradle.api.file.CopySpec;
 import org.gradle.api.file.FileCollection;
+import org.gradle.api.internal.IConventionAware;
 import org.gradle.api.plugins.ApplicationPlugin;
 import org.gradle.api.plugins.ApplicationPluginConvention;
 import org.gradle.jvm.application.scripts.TemplateBasedScriptGenerator;
@@ -46,34 +47,35 @@ final class ApplicationPluginAction implements PluginApplicationAction {
 	public void execute(Project project) {
 		ApplicationPluginConvention applicationConvention = project.getConvention()
 				.getPlugin(ApplicationPluginConvention.class);
-		DistributionContainer distributions = project.getExtensions()
-				.getByType(DistributionContainer.class);
+		DistributionContainer distributions = project.getExtensions().getByType(DistributionContainer.class);
 		Distribution distribution = distributions.create("boot");
-		CreateBootStartScripts bootStartScripts = project.getTasks()
-				.create("bootStartScripts", CreateBootStartScripts.class);
-		bootStartScripts.setDescription("Generates OS-specific start scripts to run the"
-				+ " project as a Spring Boot application.");
+		if (distribution instanceof IConventionAware) {
+			((IConventionAware) distribution).getConventionMapping().map("baseName",
+					() -> applicationConvention.getApplicationName() + "-boot");
+		}
+		CreateBootStartScripts bootStartScripts = project.getTasks().create("bootStartScripts",
+				CreateBootStartScripts.class);
+		bootStartScripts
+				.setDescription("Generates OS-specific start scripts to run the project as a Spring Boot application.");
 		((TemplateBasedScriptGenerator) bootStartScripts.getUnixStartScriptGenerator())
-				.setTemplate(project.getResources().getText()
-						.fromString(loadResource("/unixStartScript.txt")));
+				.setTemplate(project.getResources().getText().fromString(loadResource("/unixStartScript.txt")));
 		((TemplateBasedScriptGenerator) bootStartScripts.getWindowsStartScriptGenerator())
-				.setTemplate(project.getResources().getText()
-						.fromString(loadResource("/windowsStartScript.txt")));
+				.setTemplate(project.getResources().getText().fromString(loadResource("/windowsStartScript.txt")));
 		project.getConfigurations().all((configuration) -> {
 			if ("bootArchives".equals(configuration.getName())) {
-				distribution.getContents()
-						.with(project.copySpec().into("lib")
-								.from((Callable<FileCollection>) () -> configuration
-										.getArtifacts().getFiles()));
+				CopySpec libCopySpec = project.copySpec().into("lib")
+						.from((Callable<FileCollection>) () -> configuration.getArtifacts().getFiles());
+				libCopySpec.setFileMode(0644);
+				distribution.getContents().with(libCopySpec);
 				bootStartScripts.setClasspath(configuration.getArtifacts().getFiles());
 			}
 		});
-		bootStartScripts.setOutputDir(
-				project.provider(() -> new File(project.getBuildDir(), "bootScripts")));
-		bootStartScripts.setApplicationName(
-				project.provider(() -> applicationConvention.getApplicationName()));
+		bootStartScripts.getConventionMapping().map("outputDir", () -> new File(project.getBuildDir(), "bootScripts"));
+		bootStartScripts.getConventionMapping().map("applicationName", applicationConvention::getApplicationName);
+		bootStartScripts.getConventionMapping().map("defaultJvmOpts",
+				applicationConvention::getApplicationDefaultJvmArgs);
 		CopySpec binCopySpec = project.copySpec().into("bin").from(bootStartScripts);
-		binCopySpec.setFileMode(0x755);
+		binCopySpec.setFileMode(0755);
 		distribution.getContents().with(binCopySpec);
 	}
 
@@ -83,8 +85,7 @@ final class ApplicationPluginAction implements PluginApplicationAction {
 	}
 
 	private String loadResource(String name) {
-		try (InputStreamReader reader = new InputStreamReader(
-				getClass().getResourceAsStream(name))) {
+		try (InputStreamReader reader = new InputStreamReader(getClass().getResourceAsStream(name))) {
 			char[] buffer = new char[4096];
 			int read = 0;
 			StringWriter writer = new StringWriter();

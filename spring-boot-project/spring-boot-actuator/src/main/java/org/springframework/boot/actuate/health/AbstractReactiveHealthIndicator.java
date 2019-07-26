@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,14 +23,23 @@ import reactor.core.publisher.Mono;
  * {@link Health} instance and error handling.
  *
  * @author Stephane Nicoll
+ * @author Nikolay Rybak
  * @since 2.0.0
  */
 public abstract class AbstractReactiveHealthIndicator implements ReactiveHealthIndicator {
 
 	@Override
 	public final Mono<Health> health() {
-		return doHealthCheck(new Health.Builder())
-				.onErrorResume((ex) -> Mono.just(new Health.Builder().down(ex).build()));
+		try {
+			return doHealthCheck(new Health.Builder()).onErrorResume(this::handleFailure);
+		}
+		catch (Exception ex) {
+			return handleFailure(ex);
+		}
+	}
+
+	private Mono<Health> handleFailure(Throwable ex) {
+		return Mono.just(new Health.Builder().down(ex).build());
 	}
 
 	/**

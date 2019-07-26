@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,7 +16,7 @@
 
 package org.springframework.boot.actuate.audit;
 
-import java.util.Date;
+import java.time.Instant;
 import java.util.List;
 
 /**
@@ -24,6 +24,7 @@ import java.util.List;
  *
  * @author Dave Syer
  * @author Vedran Pavic
+ * @since 1.0.0
  */
 public interface AuditEventRepository {
 
@@ -34,33 +35,15 @@ public interface AuditEventRepository {
 	void add(AuditEvent event);
 
 	/**
-	 * Find audit events since the time provided.
-	 * @param after timestamp of earliest result required (or {@code null} if
-	 * unrestricted)
-	 * @return audit events
-	 * @since 1.4.0
-	 */
-	List<AuditEvent> find(Date after);
-
-	/**
-	 * Find audit events relating to the specified principal since the time provided.
+	 * Find audit events of specified type relating to the specified principal that
+	 * occurred {@link Instant#isAfter(Instant) after} the time provided.
 	 * @param principal the principal name to search for (or {@code null} if unrestricted)
-	 * @param after timestamp of earliest result required (or {@code null} if
-	 * unrestricted)
-	 * @return audit events relating to the principal
-	 */
-	List<AuditEvent> find(String principal, Date after);
-
-	/**
-	 * Find audit events of specified type relating to the specified principal since the
-	 * time provided.
-	 * @param principal the principal name to search for (or {@code null} if unrestricted)
-	 * @param after timestamp of earliest result required (or {@code null} if
+	 * @param after time after which an event must have occurred (or {@code null} if
 	 * unrestricted)
 	 * @param type the event type to search for (or {@code null} if unrestricted)
 	 * @return audit events of specified type relating to the principal
 	 * @since 1.4.0
 	 */
-	List<AuditEvent> find(String principal, Date after, String type);
+	List<AuditEvent> find(String principal, Instant after, String type);
 
 }

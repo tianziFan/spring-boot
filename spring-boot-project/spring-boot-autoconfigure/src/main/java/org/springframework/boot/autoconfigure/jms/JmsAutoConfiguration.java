@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,6 +16,8 @@
 
 package org.springframework.boot.autoconfigure.jms;
 
+import java.time.Duration;
+
 import javax.jms.ConnectionFactory;
 import javax.jms.Message;
 
@@ -25,7 +27,10 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnSingleCandidate;
+import org.springframework.boot.autoconfigure.jms.JmsProperties.DeliveryMode;
+import org.springframework.boot.autoconfigure.jms.JmsProperties.Template;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.context.properties.PropertyMapper;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
@@ -39,15 +44,16 @@ import org.springframework.jms.support.destination.DestinationResolver;
  *
  * @author Greg Turnquist
  * @author Stephane Nicoll
+ * @since 1.0.0
  */
-@Configuration
+@Configuration(proxyBeanMethods = false)
 @ConditionalOnClass({ Message.class, JmsTemplate.class })
 @ConditionalOnBean(ConnectionFactory.class)
 @EnableConfigurationProperties(JmsProperties.class)
 @Import(JmsAnnotationDrivenConfiguration.class)
 public class JmsAutoConfiguration {
 
-	@Configuration
+	@Configuration(proxyBeanMethods = false)
 	protected static class JmsTemplateConfiguration {
 
 		private final JmsProperties properties;
@@ -68,42 +74,31 @@ public class JmsAutoConfiguration {
 		@ConditionalOnMissingBean
 		@ConditionalOnSingleCandidate(ConnectionFactory.class)
 		public JmsTemplate jmsTemplate(ConnectionFactory connectionFactory) {
-			JmsTemplate jmsTemplate = new JmsTemplate(connectionFactory);
-			jmsTemplate.setPubSubDomain(this.properties.isPubSubDomain());
-			DestinationResolver destinationResolver = this.destinationResolver
-					.getIfUnique();
-			if (destinationResolver != null) {
-				jmsTemplate.setDestinationResolver(destinationResolver);
-			}
-			MessageConverter messageConverter = this.messageConverter.getIfUnique();
-			if (messageConverter != null) {
-				jmsTemplate.setMessageConverter(messageConverter);
-			}
-			JmsProperties.Template template = this.properties.getTemplate();
-			if (template.getDefaultDestination() != null) {
-				jmsTemplate.setDefaultDestinationName(template.getDefaultDestination());
-			}
-			if (template.getDeliveryDelay() != null) {
-				jmsTemplate.setDeliveryDelay(template.getDeliveryDelay());
-			}
-			jmsTemplate.setExplicitQosEnabled(template.determineQosEnabled());
-			if (template.getDeliveryMode() != null) {
-				jmsTemplate.setDeliveryMode(template.getDeliveryMode().getValue());
-			}
-			if (template.getPriority() != null) {
-				jmsTemplate.setPriority(template.getPriority());
-			}
-			if (template.getTimeToLive() != null) {
-				jmsTemplate.setTimeToLive(template.getTimeToLive());
-			}
-			if (template.getReceiveTimeout() != null) {
-				jmsTemplate.setReceiveTimeout(template.getReceiveTimeout());
-			}
-			return jmsTemplate;
+			PropertyMapper map = PropertyMapper.get();
+			JmsTemplate template = new JmsTemplate(connectionFactory);
+			template.setPubSubDomain(this.properties.isPubSubDomain());
+			map.from(this.destinationResolver::getIfUnique).whenNonNull().to(template::setDestinationResolver);
+			map.from(this.messageConverter::getIfUnique).whenNonNull().to(template::setMessageConverter);
+			mapTemplateProperties(this.properties.getTemplate(), template);
+			return template;
+		}
+
+		private void mapTemplateProperties(Template properties, JmsTemplate template) {
+			PropertyMapper map = PropertyMapper.get();
+			map.from(properties::getDefaultDestination).whenNonNull().to(template::setDefaultDestinationName);
+			map.from(properties::getDeliveryDelay).whenNonNull().as(Duration::toMillis).to(template::setDeliveryDelay);
+			map.from(properties::determineQosEnabled).to(template::setExplicitQosEnabled);
+			map.from(properties::getDeliveryMode).whenNonNull().as(DeliveryMode::getValue)
+					.to(template::setDeliveryMode);
+			map.from(properties::getPriority).whenNonNull().to(template::setPriority);
+			map.from(properties::getTimeToLive).whenNonNull().as(Duration::toMillis).to(template::setTimeToLive);
+			map.from(properties::getReceiveTimeout).whenNonNull().as(Duration::toMillis)
+					.to(template::setReceiveTimeout);
 		}
 
 	}
 
+	@Configuration(proxyBeanMethods = false)
 	@ConditionalOnClass(JmsMessagingTemplate.class)
 	@Import(JmsTemplateConfiguration.class)
 	protected static class MessagingTemplateConfiguration {
@@ -111,8 +106,15 @@ public class JmsAutoConfiguration {
 		@Bean
 		@ConditionalOnMissingBean
 		@ConditionalOnSingleCandidate(JmsTemplate.class)
-		public JmsMessagingTemplate jmsMessagingTemplate(JmsTemplate jmsTemplate) {
-			return new JmsMessagingTemplate(jmsTemplate);
+		public JmsMessagingTemplate jmsMessagingTemplate(JmsProperties properties, JmsTemplate jmsTemplate) {
+			JmsMessagingTemplate messagingTemplate = new JmsMessagingTemplate(jmsTemplate);
+			mapTemplateProperties(properties.getTemplate(), messagingTemplate);
+			return messagingTemplate;
+		}
+
+		private void mapTemplateProperties(Template properties, JmsMessagingTemplate messagingTemplate) {
+			PropertyMapper map = PropertyMapper.get().alwaysApplyingWhenNonNull();
+			map.from(properties::getDefaultDestination).to(messagingTemplate::setDefaultDestinationName);
 		}
 
 	}

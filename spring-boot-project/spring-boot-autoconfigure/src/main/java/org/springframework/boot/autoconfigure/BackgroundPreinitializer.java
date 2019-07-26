@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,16 +16,16 @@
 
 package org.springframework.boot.autoconfigure;
 
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import javax.validation.Configuration;
 import javax.validation.Validation;
 
-import org.apache.catalina.mbeans.MBeanFactory;
-
-import org.springframework.boot.context.event.ApplicationEnvironmentPreparedEvent;
 import org.springframework.boot.context.event.ApplicationFailedEvent;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.boot.context.event.ApplicationStartingEvent;
 import org.springframework.boot.context.event.SpringApplicationEvent;
 import org.springframework.boot.context.logging.LoggingApplicationListener;
 import org.springframework.context.ApplicationListener;
@@ -37,29 +37,40 @@ import org.springframework.http.converter.support.AllEncompassingFormHttpMessage
 /**
  * {@link ApplicationListener} to trigger early initialization in a background thread of
  * time consuming tasks.
+ * <p>
+ * Set the {@link #IGNORE_BACKGROUNDPREINITIALIZER_PROPERTY_NAME} system property to
+ * {@code true} to disable this mechanism and let such initialization happen in the
+ * foreground.
  *
  * @author Phillip Webb
  * @author Andy Wilkinson
+ * @author Artsiom Yudovin
  * @since 1.3.0
  */
 @Order(LoggingApplicationListener.DEFAULT_ORDER + 1)
-public class BackgroundPreinitializer
-		implements ApplicationListener<SpringApplicationEvent> {
+public class BackgroundPreinitializer implements ApplicationListener<SpringApplicationEvent> {
 
-	private static final AtomicBoolean preinitializationStarted = new AtomicBoolean(
-			false);
+	/**
+	 * System property that instructs Spring Boot how to run pre initialization. When the
+	 * property is set to {@code true}, no pre-initialization happens and each item is
+	 * initialized in the foreground as it needs to. When the property is {@code false}
+	 * (default), pre initialization runs in a separate thread in the background.
+	 * @since 2.1.0
+	 */
+	public static final String IGNORE_BACKGROUNDPREINITIALIZER_PROPERTY_NAME = "spring.backgroundpreinitializer.ignore";
+
+	private static final AtomicBoolean preinitializationStarted = new AtomicBoolean(false);
 
 	private static final CountDownLatch preinitializationComplete = new CountDownLatch(1);
 
 	@Override
 	public void onApplicationEvent(SpringApplicationEvent event) {
-		if (event instanceof ApplicationEnvironmentPreparedEvent) {
-			if (preinitializationStarted.compareAndSet(false, true)) {
-				performPreinitialization();
-			}
+		if (!Boolean.getBoolean(IGNORE_BACKGROUNDPREINITIALIZER_PROPERTY_NAME)
+				&& event instanceof ApplicationStartingEvent && multipleProcessors()
+				&& preinitializationStarted.compareAndSet(false, true)) {
+			performPreinitialization();
 		}
-		if ((event instanceof ApplicationReadyEvent
-				|| event instanceof ApplicationFailedEvent)
+		if ((event instanceof ApplicationReadyEvent || event instanceof ApplicationFailedEvent)
 				&& preinitializationStarted.get()) {
 			try {
 				preinitializationComplete.await();
@@ -70,17 +81,21 @@ public class BackgroundPreinitializer
 		}
 	}
 
+	private boolean multipleProcessors() {
+		return Runtime.getRuntime().availableProcessors() > 1;
+	}
+
 	private void performPreinitialization() {
 		try {
 			Thread thread = new Thread(new Runnable() {
 
 				@Override
 				public void run() {
-					runSafely(new MessageConverterInitializer());
-					runSafely(new MBeanFactoryInitializer());
-					runSafely(new ValidationInitializer());
-					runSafely(new JacksonInitializer());
 					runSafely(new ConversionServiceInitializer());
+					runSafely(new ValidationInitializer());
+					runSafely(new MessageConverterInitializer());
+					runSafely(new JacksonInitializer());
+					runSafely(new CharsetInitializer());
 					preinitializationComplete.countDown();
 				}
 
@@ -117,25 +132,14 @@ public class BackgroundPreinitializer
 	}
 
 	/**
-	 * Early initializer to load Tomcat MBean XML.
-	 */
-	private static class MBeanFactoryInitializer implements Runnable {
-
-		@Override
-		public void run() {
-			new MBeanFactory();
-		}
-
-	}
-
-	/**
 	 * Early initializer for javax.validation.
 	 */
 	private static class ValidationInitializer implements Runnable {
 
 		@Override
 		public void run() {
-			Validation.byDefaultProvider().configure();
+			Configuration<?> configuration = Validation.byDefaultProvider().configure();
+			configuration.buildValidatorFactory().getValidator();
 		}
 
 	}
@@ -160,6 +164,15 @@ public class BackgroundPreinitializer
 		@Override
 		public void run() {
 			new DefaultFormattingConversionService();
+		}
+
+	}
+
+	private static class CharsetInitializer implements Runnable {
+
+		@Override
+		public void run() {
+			StandardCharsets.UTF_8.name();
 		}
 
 	}

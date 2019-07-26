@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,7 +20,7 @@ import java.time.Duration;
 
 import io.micrometer.prometheus.PrometheusConfig;
 
-import org.springframework.boot.actuate.autoconfigure.metrics.export.PropertiesConfigAdapter;
+import org.springframework.boot.actuate.autoconfigure.metrics.export.properties.PropertiesConfigAdapter;
 
 /**
  * Adapter to convert {@link PrometheusProperties} to a {@link PrometheusConfig}.
@@ -28,14 +28,11 @@ import org.springframework.boot.actuate.autoconfigure.metrics.export.PropertiesC
  * @author Jon Schneider
  * @author Phillip Webb
  */
-class PrometheusPropertiesConfigAdapter
-		extends PropertiesConfigAdapter<PrometheusProperties, PrometheusConfig>
+class PrometheusPropertiesConfigAdapter extends PropertiesConfigAdapter<PrometheusProperties>
 		implements PrometheusConfig {
 
-	private static final PrometheusConfig DEFAULTS = (key) -> null;
-
 	PrometheusPropertiesConfigAdapter(PrometheusProperties properties) {
-		super(properties, DEFAULTS);
+		super(properties);
 	}
 
 	@Override
@@ -45,19 +42,12 @@ class PrometheusPropertiesConfigAdapter
 
 	@Override
 	public boolean descriptions() {
-		return get(PrometheusProperties::getDescriptions, PrometheusConfig::descriptions);
+		return get(PrometheusProperties::isDescriptions, PrometheusConfig.super::descriptions);
 	}
 
 	@Override
-	public Duration timerPercentilesMin() {
-		return get(PrometheusProperties::getTimerPercentilesMin,
-				PrometheusConfig::timerPercentilesMin);
-	}
-
-	@Override
-	public Duration timerPercentilesMax() {
-		return get(PrometheusProperties::getTimerPercentilesMax,
-				PrometheusConfig::timerPercentilesMax);
+	public Duration step() {
+		return get(PrometheusProperties::getStep, PrometheusConfig.super::step);
 	}
 
 }

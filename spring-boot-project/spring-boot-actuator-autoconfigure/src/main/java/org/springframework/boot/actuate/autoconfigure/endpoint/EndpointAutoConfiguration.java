@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,88 +16,63 @@
 
 package org.springframework.boot.actuate.autoconfigure.endpoint;
 
-import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
-import org.springframework.boot.actuate.endpoint.EndpointExposure;
-import org.springframework.boot.actuate.endpoint.OperationParameterMapper;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.actuate.endpoint.annotation.Endpoint;
-import org.springframework.boot.actuate.endpoint.cache.CachingConfigurationFactory;
-import org.springframework.boot.actuate.endpoint.convert.ConversionServiceOperationParameterMapper;
-import org.springframework.boot.actuate.endpoint.http.ActuatorMediaType;
-import org.springframework.boot.actuate.endpoint.web.EndpointMediaTypes;
-import org.springframework.boot.actuate.endpoint.web.EndpointPathResolver;
-import org.springframework.boot.actuate.endpoint.web.WebEndpointOperation;
-import org.springframework.boot.actuate.endpoint.web.annotation.WebAnnotationEndpointDiscoverer;
+import org.springframework.boot.actuate.endpoint.annotation.EndpointConverter;
+import org.springframework.boot.actuate.endpoint.invoke.ParameterValueMapper;
+import org.springframework.boot.actuate.endpoint.invoke.convert.ConversionServiceParameterValueMapper;
+import org.springframework.boot.actuate.endpoint.invoker.cache.CachingOperationInvokerAdvisor;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
-import org.springframework.context.ApplicationContext;
+import org.springframework.boot.convert.ApplicationConversionService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.convert.ConversionService;
+import org.springframework.core.convert.converter.Converter;
+import org.springframework.core.convert.converter.GenericConverter;
 import org.springframework.core.env.Environment;
 
 /**
- * {@link EnableAutoConfiguration Auto-configuration} for {@link Endpoint} support.
+ * {@link EnableAutoConfiguration Auto-configuration} for {@link Endpoint @Endpoint}
+ * support.
  *
  * @author Phillip Webb
  * @author Stephane Nicoll
- * @author Phillip Webb
+ * @author Chao Chang
  * @since 2.0.0
  */
-@Configuration
+@Configuration(proxyBeanMethods = false)
 public class EndpointAutoConfiguration {
 
 	@Bean
-	public OperationParameterMapper operationParameterMapper() {
-		return new ConversionServiceOperationParameterMapper();
+	@ConditionalOnMissingBean
+	public ParameterValueMapper endpointOperationParameterMapper(
+			@EndpointConverter ObjectProvider<Converter<?, ?>> converters,
+			@EndpointConverter ObjectProvider<GenericConverter> genericConverters) {
+		ConversionService conversionService = createConversionService(
+				converters.orderedStream().collect(Collectors.toList()),
+				genericConverters.orderedStream().collect(Collectors.toList()));
+		return new ConversionServiceParameterValueMapper(conversionService);
+	}
+
+	private ConversionService createConversionService(List<Converter<?, ?>> converters,
+			List<GenericConverter> genericConverters) {
+		if (genericConverters.isEmpty() && converters.isEmpty()) {
+			return ApplicationConversionService.getSharedInstance();
+		}
+		ApplicationConversionService conversionService = new ApplicationConversionService();
+		converters.forEach(conversionService::addConverter);
+		genericConverters.forEach(conversionService::addConverter);
+		return conversionService;
 	}
 
 	@Bean
-	@ConditionalOnMissingBean(CachingConfigurationFactory.class)
-	public DefaultCachingConfigurationFactory cacheConfigurationFactory(
-			Environment environment) {
-		return new DefaultCachingConfigurationFactory(environment);
-	}
-
-	@Configuration
-	@ConditionalOnWebApplication
-	static class EndpointWebConfiguration {
-
-		private static final List<String> MEDIA_TYPES = Arrays
-				.asList(ActuatorMediaType.V2_JSON, "application/json");
-
-		private final ApplicationContext applicationContext;
-
-		EndpointWebConfiguration(ApplicationContext applicationContext) {
-			this.applicationContext = applicationContext;
-		}
-
-		@Bean
-		public EndpointMediaTypes endpointMediaTypes() {
-			return new EndpointMediaTypes(MEDIA_TYPES, MEDIA_TYPES);
-		}
-
-		@Bean
-		@ConditionalOnMissingBean
-		public EndpointPathResolver endpointPathResolver(
-				Environment environment) {
-			return new DefaultEndpointPathResolver(environment);
-		}
-
-		@Bean
-		public EndpointProvider<WebEndpointOperation> webEndpointProvider(
-				OperationParameterMapper parameterMapper,
-				DefaultCachingConfigurationFactory cachingConfigurationFactory,
-				EndpointPathResolver endpointPathResolver) {
-			Environment environment = this.applicationContext.getEnvironment();
-			WebAnnotationEndpointDiscoverer endpointDiscoverer = new WebAnnotationEndpointDiscoverer(
-					this.applicationContext, parameterMapper, cachingConfigurationFactory,
-					endpointMediaTypes(), endpointPathResolver);
-			return new EndpointProvider<>(environment, endpointDiscoverer,
-					EndpointExposure.WEB);
-		}
-
+	@ConditionalOnMissingBean
+	public CachingOperationInvokerAdvisor endpointCachingOperationInvokerAdvisor(Environment environment) {
+		return new CachingOperationInvokerAdvisor(new EndpointIdTimeToLivePropertyFunction(environment));
 	}
 
 }

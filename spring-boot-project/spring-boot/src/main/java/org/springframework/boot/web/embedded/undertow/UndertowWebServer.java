@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,6 +16,7 @@
 
 package org.springframework.boot.web.embedded.undertow;
 
+import java.io.Closeable;
 import java.lang.reflect.Field;
 import java.net.BindException;
 import java.net.InetSocketAddress;
@@ -35,8 +36,9 @@ import org.springframework.util.ReflectionUtils;
 import org.springframework.util.StringUtils;
 
 /**
- * {@link WebServer} that can be used to control a Undertow web server. Usually this class
- * should be created using the {@link UndertowReactiveWebServerFactory} and not directly.
+ * {@link WebServer} that can be used to control an Undertow web server. Usually this
+ * class should be created using the {@link UndertowReactiveWebServerFactory} and not
+ * directly.
  *
  * @author Ivan Sopov
  * @author Andy Wilkinson
@@ -47,13 +49,15 @@ import org.springframework.util.StringUtils;
  */
 public class UndertowWebServer implements WebServer {
 
-	private static final Log logger = LogFactory.getLog(UndertowServletWebServer.class);
+	private static final Log logger = LogFactory.getLog(UndertowWebServer.class);
 
 	private final Object monitor = new Object();
 
 	private final Undertow.Builder builder;
 
 	private final boolean autoStart;
+
+	private final Closeable closeable;
 
 	private Undertow undertow;
 
@@ -65,8 +69,20 @@ public class UndertowWebServer implements WebServer {
 	 * @param autoStart if the server should be started
 	 */
 	public UndertowWebServer(Undertow.Builder builder, boolean autoStart) {
+		this(builder, autoStart, null);
+	}
+
+	/**
+	 * Create a new {@link UndertowWebServer} instance.
+	 * @param builder the builder
+	 * @param autoStart if the server should be started
+	 * @param closeable called when the server is stopped
+	 * @since 2.0.4
+	 */
+	public UndertowWebServer(Undertow.Builder builder, boolean autoStart, Closeable closeable) {
 		this.builder = builder;
 		this.autoStart = autoStart;
+		this.closeable = closeable;
 	}
 
 	@Override
@@ -84,8 +100,7 @@ public class UndertowWebServer implements WebServer {
 				}
 				this.undertow.start();
 				this.started = true;
-				UndertowWebServer.logger
-						.info("Undertow started on port(s) " + getPortsDescription());
+				logger.info("Undertow started on port(s) " + getPortsDescription());
 			}
 			catch (Exception ex) {
 				try {
@@ -94,8 +109,7 @@ public class UndertowWebServer implements WebServer {
 						List<UndertowWebServer.Port> actualPorts = getActualPorts();
 						failedPorts.removeAll(actualPorts);
 						if (failedPorts.size() == 1) {
-							throw new PortInUseException(
-									failedPorts.iterator().next().getNumber());
+							throw new PortInUseException(failedPorts.iterator().next().getNumber());
 						}
 					}
 					throw new WebServerException("Unable to start embedded Undertow", ex);
@@ -111,6 +125,7 @@ public class UndertowWebServer implements WebServer {
 		try {
 			if (this.undertow != null) {
 				this.undertow.stop();
+				this.closeable.close();
 			}
 		}
 		catch (Exception ex) {
@@ -159,17 +174,15 @@ public class UndertowWebServer implements WebServer {
 	private List<BoundChannel> extractChannels() {
 		Field channelsField = ReflectionUtils.findField(Undertow.class, "channels");
 		ReflectionUtils.makeAccessible(channelsField);
-		return (List<BoundChannel>) ReflectionUtils.getField(channelsField,
-				this.undertow);
+		return (List<BoundChannel>) ReflectionUtils.getField(channelsField, this.undertow);
 	}
 
 	private UndertowWebServer.Port getPortFromChannel(BoundChannel channel) {
 		SocketAddress socketAddress = channel.getLocalAddress();
 		if (socketAddress instanceof InetSocketAddress) {
-			String protocol = ReflectionUtils.findField(channel.getClass(), "ssl") != null
-					? "https" : "http";
-			return new UndertowWebServer.Port(
-					((InetSocketAddress) socketAddress).getPort(), protocol);
+			Field sslField = ReflectionUtils.findField(channel.getClass(), "ssl");
+			String protocol = (sslField != null) ? "https" : "http";
+			return new UndertowWebServer.Port(((InetSocketAddress) socketAddress).getPort(), protocol);
 		}
 		return null;
 	}
@@ -213,6 +226,9 @@ public class UndertowWebServer implements WebServer {
 			this.started = false;
 			try {
 				this.undertow.stop();
+				if (this.closeable != null) {
+					this.closeable.close();
+				}
 			}
 			catch (Exception ex) {
 				throw new WebServerException("Unable to stop undertow", ex);
@@ -232,7 +248,7 @@ public class UndertowWebServer implements WebServer {
 	/**
 	 * An active Undertow port.
 	 */
-	private final static class Port {
+	private static final class Port {
 
 		private final int number;
 
@@ -243,17 +259,7 @@ public class UndertowWebServer implements WebServer {
 			this.protocol = protocol;
 		}
 
-		public int getNumber() {
-			return this.number;
-		}
-
-		@Override
-		public String toString() {
-			return this.number + " (" + this.protocol + ")";
-		}
-
-		@Override
-		public int hashCode() {
+		int getNumber() {
 			return this.number;
 		}
 
@@ -273,6 +279,16 @@ public class UndertowWebServer implements WebServer {
 				return false;
 			}
 			return true;
+		}
+
+		@Override
+		public int hashCode() {
+			return this.number;
+		}
+
+		@Override
+		public String toString() {
+			return this.number + " (" + this.protocol + ")";
 		}
 
 	}

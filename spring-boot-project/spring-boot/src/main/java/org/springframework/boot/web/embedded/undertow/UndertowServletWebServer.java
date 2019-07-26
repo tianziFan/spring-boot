@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -28,17 +28,8 @@ import javax.servlet.ServletException;
 import io.undertow.Handlers;
 import io.undertow.Undertow;
 import io.undertow.Undertow.Builder;
-import io.undertow.attribute.RequestHeaderAttribute;
-import io.undertow.predicate.Predicate;
-import io.undertow.predicate.Predicates;
 import io.undertow.server.HttpHandler;
-import io.undertow.server.HttpServerExchange;
-import io.undertow.server.handlers.encoding.ContentEncodingRepository;
-import io.undertow.server.handlers.encoding.EncodingHandler;
-import io.undertow.server.handlers.encoding.GzipEncodingProvider;
 import io.undertow.servlet.api.DeploymentManager;
-import io.undertow.util.Headers;
-import io.undertow.util.HttpString;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.xnio.channels.BoundChannel;
@@ -47,9 +38,6 @@ import org.springframework.boot.web.server.Compression;
 import org.springframework.boot.web.server.PortInUseException;
 import org.springframework.boot.web.server.WebServer;
 import org.springframework.boot.web.server.WebServerException;
-import org.springframework.http.HttpHeaders;
-import org.springframework.util.MimeType;
-import org.springframework.util.MimeTypeUtils;
 import org.springframework.util.ReflectionUtils;
 import org.springframework.util.StringUtils;
 
@@ -62,6 +50,7 @@ import org.springframework.util.StringUtils;
  * @author Andy Wilkinson
  * @author Eddú Meléndez
  * @author Christoph Dreis
+ * @author Kristine Jetzke
  * @since 2.0.0
  * @see UndertowServletWebServerFactory
  */
@@ -97,8 +86,8 @@ public class UndertowServletWebServer implements WebServer {
 	 * @param autoStart if the server should be started
 	 * @param compression compression configuration
 	 */
-	public UndertowServletWebServer(Builder builder, DeploymentManager manager,
-			String contextPath, boolean autoStart, Compression compression) {
+	public UndertowServletWebServer(Builder builder, DeploymentManager manager, String contextPath, boolean autoStart,
+			Compression compression) {
 		this(builder, manager, contextPath, false, autoStart, compression);
 	}
 
@@ -111,11 +100,9 @@ public class UndertowServletWebServer implements WebServer {
 	 * @param autoStart if the server should be started
 	 * @param compression compression configuration
 	 */
-	public UndertowServletWebServer(Builder builder, DeploymentManager manager,
-			String contextPath, boolean useForwardHeaders, boolean autoStart,
-			Compression compression) {
-		this(builder, manager, contextPath, useForwardHeaders, autoStart, compression,
-				null);
+	public UndertowServletWebServer(Builder builder, DeploymentManager manager, String contextPath,
+			boolean useForwardHeaders, boolean autoStart, Compression compression) {
+		this(builder, manager, contextPath, useForwardHeaders, autoStart, compression, null);
 	}
 
 	/**
@@ -128,9 +115,8 @@ public class UndertowServletWebServer implements WebServer {
 	 * @param compression compression configuration
 	 * @param serverHeader string to be used in HTTP header
 	 */
-	public UndertowServletWebServer(Builder builder, DeploymentManager manager,
-			String contextPath, boolean useForwardHeaders, boolean autoStart,
-			Compression compression, String serverHeader) {
+	public UndertowServletWebServer(Builder builder, DeploymentManager manager, String contextPath,
+			boolean useForwardHeaders, boolean autoStart, Compression compression, String serverHeader) {
 		this.builder = builder;
 		this.manager = manager;
 		this.contextPath = contextPath;
@@ -155,8 +141,8 @@ public class UndertowServletWebServer implements WebServer {
 				}
 				this.undertow.start();
 				this.started = true;
-				UndertowServletWebServer.logger
-						.info("Undertow started on port(s) " + getPortsDescription());
+				UndertowServletWebServer.logger.info("Undertow started on port(s) " + getPortsDescription()
+						+ " with context path '" + this.contextPath + "'");
 			}
 			catch (Exception ex) {
 				try {
@@ -165,8 +151,7 @@ public class UndertowServletWebServer implements WebServer {
 						List<Port> actualPorts = getActualPorts();
 						failedPorts.removeAll(actualPorts);
 						if (failedPorts.size() == 1) {
-							throw new PortInUseException(
-									failedPorts.iterator().next().getNumber());
+							throw new PortInUseException(failedPorts.iterator().next().getNumber());
 						}
 					}
 					throw new WebServerException("Unable to start embedded Undertow", ex);
@@ -175,6 +160,12 @@ public class UndertowServletWebServer implements WebServer {
 					stopSilently();
 				}
 			}
+		}
+	}
+
+	public DeploymentManager getDeploymentManager() {
+		synchronized (this.monitor) {
+			return this.manager;
 		}
 	}
 
@@ -214,35 +205,11 @@ public class UndertowServletWebServer implements WebServer {
 	}
 
 	private HttpHandler getContextHandler(HttpHandler httpHandler) {
-		HttpHandler contextHandler = configurationCompressionIfNecessary(httpHandler);
+		HttpHandler contextHandler = UndertowCompressionConfigurer.configureCompression(this.compression, httpHandler);
 		if (StringUtils.isEmpty(this.contextPath)) {
 			return contextHandler;
 		}
 		return Handlers.path().addPrefixPath(this.contextPath, contextHandler);
-	}
-
-	private HttpHandler configurationCompressionIfNecessary(HttpHandler httpHandler) {
-		if (this.compression == null || !this.compression.getEnabled()) {
-			return httpHandler;
-		}
-		ContentEncodingRepository repository = new ContentEncodingRepository();
-		repository.addEncodingHandler("gzip", new GzipEncodingProvider(), 50,
-				Predicates.and(getCompressionPredicates(this.compression)));
-		return new EncodingHandler(repository).setNext(httpHandler);
-	}
-
-	private Predicate[] getCompressionPredicates(Compression compression) {
-		List<Predicate> predicates = new ArrayList<>();
-		predicates.add(new MaxSizePredicate(compression.getMinResponseSize()));
-		predicates.add(new CompressibleMimeTypePredicate(compression.getMimeTypes()));
-		if (compression.getExcludedUserAgents() != null) {
-			for (String agent : compression.getExcludedUserAgents()) {
-				RequestHeaderAttribute agentHeader = new RequestHeaderAttribute(
-						new HttpString(HttpHeaders.USER_AGENT));
-				predicates.add(Predicates.not(Predicates.regex(agentHeader, agent)));
-			}
-		}
-		return predicates.toArray(new Predicate[predicates.size()]);
 	}
 
 	private String getPortsDescription() {
@@ -275,15 +242,13 @@ public class UndertowServletWebServer implements WebServer {
 	private List<BoundChannel> extractChannels() {
 		Field channelsField = ReflectionUtils.findField(Undertow.class, "channels");
 		ReflectionUtils.makeAccessible(channelsField);
-		return (List<BoundChannel>) ReflectionUtils.getField(channelsField,
-				this.undertow);
+		return (List<BoundChannel>) ReflectionUtils.getField(channelsField, this.undertow);
 	}
 
 	private Port getPortFromChannel(BoundChannel channel) {
 		SocketAddress socketAddress = channel.getLocalAddress();
 		if (socketAddress instanceof InetSocketAddress) {
-			String protocol = ReflectionUtils.findField(channel.getClass(), "ssl") != null
-					? "https" : "http";
+			String protocol = (ReflectionUtils.findField(channel.getClass(), "ssl") != null) ? "https" : "http";
 			return new Port(((InetSocketAddress) socketAddress).getPort(), protocol);
 		}
 		return null;
@@ -293,7 +258,10 @@ public class UndertowServletWebServer implements WebServer {
 		List<Port> ports = new ArrayList<>();
 		for (Object listener : extractListeners()) {
 			try {
-				ports.add(getPortFromListener(listener));
+				Port port = getPortFromListener(listener);
+				if (port.getNumber() != 0) {
+					ports.add(port);
+				}
 			}
 			catch (Exception ex) {
 				// Continue
@@ -328,6 +296,7 @@ public class UndertowServletWebServer implements WebServer {
 			this.started = false;
 			try {
 				this.manager.stop();
+				this.manager.undeploy();
 				this.undertow.stop();
 			}
 			catch (Exception ex) {
@@ -348,7 +317,7 @@ public class UndertowServletWebServer implements WebServer {
 	/**
 	 * An active Undertow port.
 	 */
-	private final static class Port {
+	private static final class Port {
 
 		private final int number;
 
@@ -359,17 +328,7 @@ public class UndertowServletWebServer implements WebServer {
 			this.protocol = protocol;
 		}
 
-		public int getNumber() {
-			return this.number;
-		}
-
-		@Override
-		public String toString() {
-			return this.number + " (" + this.protocol + ")";
-		}
-
-		@Override
-		public int hashCode() {
+		int getNumber() {
 			return this.number;
 		}
 
@@ -391,54 +350,14 @@ public class UndertowServletWebServer implements WebServer {
 			return true;
 		}
 
-	}
-
-	private static class CompressibleMimeTypePredicate implements Predicate {
-
-		private final List<MimeType> mimeTypes;
-
-		CompressibleMimeTypePredicate(String[] mimeTypes) {
-			this.mimeTypes = new ArrayList<>(mimeTypes.length);
-			for (String mimeTypeString : mimeTypes) {
-				this.mimeTypes.add(MimeTypeUtils.parseMimeType(mimeTypeString));
-			}
+		@Override
+		public int hashCode() {
+			return this.number;
 		}
 
 		@Override
-		public boolean resolve(HttpServerExchange value) {
-			String contentType = value.getResponseHeaders()
-					.getFirst(HttpHeaders.CONTENT_TYPE);
-			if (contentType != null) {
-				for (MimeType mimeType : this.mimeTypes) {
-					if (mimeType
-							.isCompatibleWith(MimeTypeUtils.parseMimeType(contentType))) {
-						return true;
-					}
-				}
-			}
-			return false;
-		}
-
-	}
-
-	/**
-	 * Predicate that returns true if the Content-Size of a request is above a given value
-	 * or is missing.
-	 */
-	private static class MaxSizePredicate implements Predicate {
-
-		private final Predicate maxContentSize;
-
-		MaxSizePredicate(int size) {
-			this.maxContentSize = Predicates.maxContentSize(size);
-		}
-
-		@Override
-		public boolean resolve(HttpServerExchange value) {
-			if (value.getResponseHeaders().contains(Headers.CONTENT_LENGTH)) {
-				return this.maxContentSize.resolve(value);
-			}
-			return true;
+		public String toString() {
+			return this.number + " (" + this.protocol + ")";
 		}
 
 	}

@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -26,11 +26,12 @@ import java.lang.annotation.Target;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.autoconfigure.cache.CacheType;
 import org.springframework.boot.test.autoconfigure.properties.PropertyMapping;
+import org.springframework.cache.CacheManager;
 import org.springframework.cache.support.NoOpCacheManager;
 
 /**
- * Annotation that can be applied to a test class to enable and configure
- * auto-configuration of caching. By default this annotation installs a
+ * Annotation that can be applied to a test class to configure a test {@link CacheManager}
+ * if none has been defined yet. By default this annotation installs a
  * {@link NoOpCacheManager}.
  *
  * @author Phillip Webb

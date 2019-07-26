@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -29,11 +29,12 @@ import javax.management.ObjectName;
 public interface EndpointObjectNameFactory {
 
 	/**
-	 * Generate an {@link ObjectName} for the specified {@link EndpointMBean endpoint}.
-	 * @param mBean the endpoint to handle
+	 * Generate an {@link ObjectName} for the specified {@link ExposableJmxEndpoint
+	 * endpoint}.
+	 * @param endpoint the endpoint MBean to handle
 	 * @return the {@link ObjectName} to use for the endpoint
 	 * @throws MalformedObjectNameException if the object name is invalid
 	 */
-	ObjectName generate(EndpointMBean mBean) throws MalformedObjectNameException;
+	ObjectName getObjectName(ExposableJmxEndpoint endpoint) throws MalformedObjectNameException;
 
 }
